@@ -744,6 +744,7 @@
                                 <div style="font-size: 1.2em; font-weight: bold;">${escapeHtml(data.item1.name)}</div>
                                 <div style="display: flex; gap: 5px;">
                                     <a href="${escapeHtml(searchUrl1)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
+                                    <button onclick="autoFillYouTube(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
                                     <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
                                 </div>
                             </div>
@@ -757,6 +758,7 @@
                                 <div style="font-size: 1.2em; font-weight: bold;">${escapeHtml(data.item2.name)}</div>
                                 <div style="display: flex; gap: 5px;">
                                     <a href="${escapeHtml(searchUrl2)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
+                                    <button onclick="autoFillYouTube(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
                                     <button onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
                                 </div>
                             </div>
@@ -892,6 +894,7 @@
                                 })() : ''}
                                 <div class="item-actions">
                                     <a href="${escapeHtml(searchUrl)}" target="_blank" style="padding: 6px 12px; font-size: 0.85em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">🔍 Search YouTube</a>
+                                    <button onclick="autoFillYouTube(${item.id}, event)" style="padding: 6px 12px; font-size: 0.85em; background: #28a745; color: white;">🤖 Auto YT</button>
                                     <button onclick="editItem(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">✏️ Edit</button>
                                     <button onclick="viewItemVotes(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">📊 View Votes</button>
                                 </div>
@@ -1601,6 +1604,63 @@
                 console.error('Error updating search prefix:', error);
                 alert('Error updating search prefix');
             });
+        }
+
+        async function autoFillYouTube(itemId, event) {
+            if (event) event.stopPropagation();
+            
+            // Show loading state
+            let buttonElement = null;
+            const originalText = '🤖 Auto YT';
+            if (event && event.target) {
+                buttonElement = event.target;
+                buttonElement.disabled = true;
+                buttonElement.textContent = '⏳ Loading...';
+            }
+            
+            try {
+                const response = await fetch(`/api/items/${itemId}/auto-youtube`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    // Update was successful
+                    // If we're in a matchup view, reload the same matchup to show the video
+                    if (window.currentMatchup && window.currentMatchup.item1_id && window.currentMatchup.item2_id) {
+                        await loadNextMatchup(window.currentMatchup.item1_id, window.currentMatchup.item2_id);
+                    } else {
+                        // Otherwise just reload rankings
+                        await loadRankings();
+                    }
+                    
+                    // Show success message briefly
+                    if (buttonElement) {
+                        buttonElement.textContent = '✓ Done!';
+                        setTimeout(() => {
+                            if (buttonElement) {
+                                buttonElement.textContent = originalText;
+                                buttonElement.disabled = false;
+                            }
+                        }, 1500);
+                    }
+                } else {
+                    alert(data.error || 'Could not automatically find YouTube video. Please search manually and add the link.');
+                    if (buttonElement) {
+                        buttonElement.textContent = originalText;
+                        buttonElement.disabled = false;
+                    }
+                }
+            } catch (error) {
+                console.error('Error auto-filling YouTube:', error);
+                alert('Error auto-filling YouTube video. Please try again or add manually.');
+                if (buttonElement) {
+                    buttonElement.textContent = originalText;
+                    buttonElement.disabled = false;
+                }
+            }
         }
     </script>
 </body>

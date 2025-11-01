@@ -28,7 +28,15 @@ A web application that helps you rank large collections of items (hundreds to th
    cd ranqr
    ```
 
-2. Build and run the application:
+2. (Optional) Set `YOUTUBE_API_KEY` environment variable for better auto-fill YouTube functionality:
+   ```bash
+   export YOUTUBE_API_KEY=your_api_key_here
+   ```
+   Or add it to `docker-compose.yml` under the `environment` section.
+   
+   Without an API key, the auto-fill feature will use HTML scraping as a fallback, which may be less reliable.
+
+3. Build and run the application:
    ```bash
    make serve
    ```
@@ -44,7 +52,7 @@ A web application that helps you rank large collections of items (hundreds to th
    docker run -p 5000:5000 -v $(pwd)/data:/app/data ranqr
    ```
 
-3. Open your browser and navigate to:
+4. Open your browser and navigate to:
    ```
    http://localhost:5000
    ```

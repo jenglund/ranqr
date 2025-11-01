@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import os
 from datetime import datetime
+import urllib.parse
 
 app = Flask(__name__)
 
@@ -326,6 +327,147 @@ def normalize_youtube_url(url):
     # If it's not a video ID and doesn't have a protocol, return as-is
     # (might be invalid, but let user fix it)
     return url
+
+@app.route('/api/items/<int:item_id>/auto-youtube', methods=['POST'])
+def auto_fill_youtube(item_id):
+    """
+    Auto-fill YouTube link by searching for the item and getting first result.
+    
+    Supports two methods:
+    1. YouTube Data API v3 (preferred, requires YOUTUBE_API_KEY env var)
+    2. HTML scraping fallback (works without API key, less reliable)
+    """
+    item = Item.query.get_or_404(item_id)
+    collection = item.collection
+    
+    # Build search query: prefix + item name
+    search_query = item.name
+    if collection.search_prefix:
+        search_query = f"{collection.search_prefix} {item.name}"
+    
+    try:
+        import requests
+        import re
+        import json as json_lib
+        
+        # Method 1: Try YouTube Data API v3 first (if API key is configured)
+        youtube_api_key = os.environ.get('YOUTUBE_API_KEY')
+        if youtube_api_key:
+            api_url = 'https://www.googleapis.com/youtube/v3/search'
+            params = {
+                'part': 'snippet',
+                'q': search_query,
+                'type': 'video',
+                'maxResults': 1,
+                'key': youtube_api_key
+            }
+            
+            response = requests.get(api_url, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('items') and len(data['items']) > 0:
+                    video_id = data['items'][0]['id']['videoId']
+                    youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+                    
+                    # Update item
+                    item.media_link = normalize_youtube_url(youtube_url)
+                    db.session.commit()
+                    
+                    return jsonify({
+                        'success': True,
+                        'item': {
+                            'id': item.id,
+                            'name': item.name,
+                            'media_link': item.media_link,
+                            'points': item.points
+                        }
+                    })
+        
+        # Method 2: Fallback - Try scraping YouTube search results
+        # Note: YouTube's HTML structure changes frequently, so this may break
+        try:
+            from bs4 import BeautifulSoup
+            
+            search_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(search_query)}"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5'
+            }
+            
+            response = requests.get(search_url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                # Parse HTML to find first video link
+                # Look for /watch?v=VIDEO_ID pattern in the page
+                page_text = response.text
+                # Look for /watch?v=VIDEO_ID pattern
+                video_id_pattern = r'/watch\?v=([a-zA-Z0-9_-]{11})'
+                matches = re.findall(video_id_pattern, page_text)
+                if matches:
+                    # Take the first unique video ID found
+                    video_id = matches[0]
+                    youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+                    item.media_link = normalize_youtube_url(youtube_url)
+                    db.session.commit()
+                    return jsonify({
+                        'success': True,
+                        'item': {
+                            'id': item.id,
+                            'name': item.name,
+                            'media_link': item.media_link,
+                            'points': item.points
+                        }
+                    })
+                
+                # Alternative: Try parsing JSON from ytInitialData
+                soup = BeautifulSoup(response.text, 'html.parser')
+                scripts = soup.find_all('script')
+                for script in scripts:
+                    if script.string and 'var ytInitialData' in script.string:
+                        match = re.search(r'var ytInitialData = ({.*?});', script.string, re.DOTALL)
+                        if match:
+                            try:
+                                data = json_lib.loads(match.group(1))
+                                # Navigate through nested structure to find first video
+                                contents = data.get('contents', {})
+                                two_column = contents.get('twoColumnSearchResultsRenderer', {})
+                                primary_contents = two_column.get('primaryContents', {})
+                                section_list = primary_contents.get('sectionListRenderer', {})
+                                contents_list = section_list.get('contents', [])
+                                
+                                for section in contents_list:
+                                    item_section = section.get('itemSectionRenderer', {})
+                                    items_list = item_section.get('contents', [])
+                                    for video_item in items_list:
+                                        video_renderer = video_item.get('videoRenderer', {})
+                                        if video_renderer:
+                                            video_id = video_renderer.get('videoId')
+                                            if video_id:
+                                                youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+                                                item.media_link = normalize_youtube_url(youtube_url)
+                                                db.session.commit()
+                                                return jsonify({
+                                                    'success': True,
+                                                    'item': {
+                                                        'id': item.id,
+                                                        'name': item.name,
+                                                        'media_link': item.media_link,
+                                                        'points': item.points
+                                                    }
+                                                })
+                            except (json_lib.JSONDecodeError, KeyError, TypeError) as e:
+                                # If JSON parsing fails, continue to next method
+                                pass
+        except Exception as scrape_error:
+            # If scraping fails, log but don't fail the request yet
+            print(f"Scraping fallback failed: {scrape_error}")
+        
+        return jsonify({
+            'error': 'Could not find YouTube video. Please try setting YOUTUBE_API_KEY environment variable for better results, or manually search and add the link.'
+        }), 400
+        
+    except Exception as e:
+        return jsonify({'error': f'Error fetching YouTube result: {str(e)}'}), 500
 
 @app.route('/api/items/<int:item_id>', methods=['PUT', 'PATCH'])
 def update_item(item_id):
