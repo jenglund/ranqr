@@ -55,6 +55,7 @@ CORS(app)
 class Collection(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
+    search_prefix = db.Column(db.String(200), nullable=True)  # YouTube search prefix for items
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     items = db.relationship('Item', backref='collection', lazy=True, cascade='all, delete-orphan')
     comparisons = db.relationship('Comparison', backref='collection', lazy=True, cascade='all, delete-orphan')
@@ -88,6 +89,7 @@ def get_collections():
     return jsonify([{
         'id': c.id,
         'name': c.name,
+        'search_prefix': c.search_prefix,
         'item_count': len(c.items),
         'created_at': c.created_at.isoformat() if c.created_at else None
     } for c in collections])
@@ -95,11 +97,17 @@ def get_collections():
 @app.route('/api/collections', methods=['POST'])
 def create_collection():
     data = request.json
-    collection = Collection(name=data['name'])
-    db.session.add(collection)
-    db.session.commit()
+    name = data.get('name', '').strip()
+    search_prefix = data.get('search_prefix', '').strip() or None
     
-    items_text = data.get('items', '')
+    if not name:
+        return jsonify({'error': 'Collection name is required'}), 400
+    
+    collection = Collection(name=name, search_prefix=search_prefix)
+    db.session.add(collection)
+    db.session.flush()  # Get the collection ID
+    
+    items_text = data.get('items', '').strip()
     items_list = [item.strip() for item in items_text.split('\n') if item.strip()]
     
     for item_name in items_list:
@@ -107,7 +115,7 @@ def create_collection():
         db.session.add(item)
     
     db.session.commit()
-    return jsonify({'id': collection.id, 'name': collection.name}), 201
+    return jsonify({'id': collection.id, 'name': collection.name, 'search_prefix': collection.search_prefix}), 201
 
 @app.route('/api/collections/<int:collection_id>', methods=['GET'])
 def get_collection(collection_id):
@@ -117,6 +125,7 @@ def get_collection(collection_id):
     return jsonify({
         'id': collection.id,
         'name': collection.name,
+        'search_prefix': collection.search_prefix,
         'items': [{
             'id': item.id,
             'name': item.name,
@@ -258,6 +267,28 @@ def submit_matchup_result(collection_id):
     db.session.commit()
     
     return jsonify({'success': True})
+
+@app.route('/api/collections/<int:collection_id>', methods=['PUT', 'PATCH'])
+def update_collection(collection_id):
+    """Update collection properties like search_prefix."""
+    collection = Collection.query.get_or_404(collection_id)
+    data = request.json
+    
+    if 'name' in data:
+        collection.name = data['name'].strip()
+    if 'search_prefix' in data:
+        collection.search_prefix = data['search_prefix'].strip() if data['search_prefix'] else None
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'collection': {
+            'id': collection.id,
+            'name': collection.name,
+            'search_prefix': collection.search_prefix
+        }
+    })
 
 @app.route('/api/collections/<int:collection_id>/items', methods=['POST'])
 def add_items(collection_id):
@@ -463,6 +494,7 @@ def export_collection(collection_id):
         'exported_at': datetime.utcnow().isoformat(),
         'collection': {
             'name': collection.name,
+            'search_prefix': collection.search_prefix,
             'created_at': collection.created_at.isoformat() if collection.created_at else None
         },
         'items': [{
@@ -488,7 +520,10 @@ def import_collection():
         return jsonify({'error': 'Invalid import data. Expected collection, items, and optionally comparisons.'}), 400
     
     # Create new collection
-    collection = Collection(name=data['collection']['name'])
+    collection = Collection(
+        name=data['collection']['name'],
+        search_prefix=data['collection'].get('search_prefix')
+    )
     db.session.add(collection)
     db.session.flush()  # Get the collection ID
     
@@ -652,17 +687,26 @@ if not os.environ.get('TESTING') and not app.config.get('TESTING'):
     with app.app_context():
         db.create_all()
         
-        # Migration: Add media_link column if it doesn't exist (for existing databases)
+        # Migration: Add columns if they don't exist (for existing databases)
         try:
             from sqlalchemy import inspect, text
             inspector = inspect(db.engine)
-            columns = [col['name'] for col in inspector.get_columns('item')]
-            if 'media_link' not in columns:
-                # Add the column if it doesn't exist
+            
+            # Migration: Add media_link column if it doesn't exist
+            item_columns = [col['name'] for col in inspector.get_columns('item')]
+            if 'media_link' not in item_columns:
                 with db.engine.connect() as conn:
                     conn.execute(text('ALTER TABLE item ADD COLUMN media_link VARCHAR(1000)'))
                     conn.commit()
                 print("✓ Added media_link column to existing database")
+            
+            # Migration: Add search_prefix column if it doesn't exist
+            collection_columns = [col['name'] for col in inspector.get_columns('collection')]
+            if 'search_prefix' not in collection_columns:
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE collection ADD COLUMN search_prefix VARCHAR(200)'))
+                    conn.commit()
+                print("✓ Added search_prefix column to existing database")
         except Exception as e:
             # If migration fails, it's likely a new database or the column already exists
             pass

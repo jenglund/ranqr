@@ -439,6 +439,11 @@
                     <input type="text" id="collection-name" placeholder="Enter collection name">
                 </div>
                 <div class="form-group">
+                    <label for="search-prefix-input">YouTube Search Prefix (optional):</label>
+                    <input type="text" id="search-prefix-input" placeholder="e.g., artist name, series name...">
+                    <small style="color: #666; font-size: 0.9em;">This will be added to YouTube searches for items in this collection</small>
+                </div>
+                <div class="form-group">
                     <label for="items-input">Items (one per line):</label>
                     <textarea id="items-input" placeholder="Enter items, one per line..."></textarea>
                 </div>
@@ -476,7 +481,14 @@
             </div>
 
             <div id="rankings-section" class="card hidden">
-                <h3 class="section-title">Current Rankings</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 class="section-title" style="margin: 0;">Current Rankings</h3>
+                    <button onclick="editCollectionSearchPrefix()" style="padding: 6px 12px; font-size: 0.9em;">⚙️ Edit Search Prefix</button>
+                </div>
+                
+                <div id="collection-search-prefix-display" style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                    <strong>YouTube Search Prefix:</strong> <span id="search-prefix-value">None</span>
+                </div>
                 
                 <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
                     <div style="position: relative;">
@@ -608,8 +620,15 @@
             }
         }
 
+        function getYouTubeSearchUrl(searchPrefix, itemName) {
+            // Combine search prefix and item name, properly URL-encoded
+            const query = searchPrefix ? `${searchPrefix} ${itemName}` : itemName;
+            return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+        }
+
         async function createCollection() {
             const name = document.getElementById('collection-name').value.trim();
+            const searchPrefix = document.getElementById('search-prefix-input').value.trim();
             const items = document.getElementById('items-input').value.trim();
             
             if (!name) {
@@ -626,7 +645,11 @@
                 const response = await fetch('/api/collections', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name, items})
+                    body: JSON.stringify({
+                        name,
+                        search_prefix: searchPrefix || null,
+                        items
+                    })
                 });
                 
                 if (response.ok) {
@@ -652,6 +675,12 @@
                 document.getElementById('collections-view').classList.add('hidden');
                 document.getElementById('collection-view').classList.remove('hidden');
                 document.getElementById('collection-title').textContent = currentCollection.name;
+                
+                // Update search prefix display
+                const prefixDisplay = document.getElementById('search-prefix-value');
+                if (prefixDisplay) {
+                    prefixDisplay.textContent = currentCollection.search_prefix || 'None';
+                }
                 
                 showRankings();
             } catch (error) {
@@ -703,12 +732,20 @@
                 const video1 = data.item1.media_link ? getYouTubeEmbed(data.item1.media_link) : '';
                 const video2 = data.item2.media_link ? getYouTubeEmbed(data.item2.media_link) : '';
                 
+                // Get search prefix for YouTube search links
+                const searchPrefix = currentCollection ? (currentCollection.search_prefix || '') : '';
+                const searchUrl1 = getYouTubeSearchUrl(searchPrefix, data.item1.name);
+                const searchUrl2 = getYouTubeSearchUrl(searchPrefix, data.item2.name);
+                
                 container.innerHTML = `
                     <div class="matchup-item" onclick="selectMatchup('item1')" id="item1-select">
                         <div class="matchup-item-content">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                 <div style="font-size: 1.2em; font-weight: bold;">${escapeHtml(data.item1.name)}</div>
-                                <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                                <div style="display: flex; gap: 5px;">
+                                    <a href="${escapeHtml(searchUrl1)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
+                                    <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                                </div>
                             </div>
                             ${video1}
                         </div>
@@ -718,7 +755,10 @@
                         <div class="matchup-item-content">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                 <div style="font-size: 1.2em; font-weight: bold;">${escapeHtml(data.item2.name)}</div>
-                                <button onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                                <div style="display: flex; gap: 5px;">
+                                    <a href="${escapeHtml(searchUrl2)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
+                                    <button onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                                </div>
                             </div>
                             ${video2}
                         </div>
@@ -821,10 +861,13 @@
                     </div>
                 `;
                 
+                const searchPrefix = collection.search_prefix || '';
+                
                 collection.items.forEach((item, index) => {
                     const li = document.createElement('li');
                     const pointsClass = item.points > 0 ? 'positive' : item.points < 0 ? 'negative' : '';
                     const editingId = `item-${item.id}`;
+                    const searchUrl = getYouTubeSearchUrl(searchPrefix, item.name);
                     
                     li.innerHTML = `
                         <div style="flex: 1; display: flex; flex-direction: column;">
@@ -848,6 +891,7 @@
                                     return `<div class="media-link-display">📎 <a href="${escapeHtml(normalizedUrl)}" target="_blank">${escapeHtml(displayText)}</a></div>`;
                                 })() : ''}
                                 <div class="item-actions">
+                                    <a href="${escapeHtml(searchUrl)}" target="_blank" style="padding: 6px 12px; font-size: 0.85em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">🔍 Search YouTube</a>
                                     <button onclick="editItem(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">✏️ Edit</button>
                                     <button onclick="viewItemVotes(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">📊 View Votes</button>
                                 </div>
@@ -1156,6 +1200,7 @@
         function hideCreateDialog() {
             document.getElementById('create-collection-form').classList.add('hidden');
             document.getElementById('collection-name').value = '';
+            document.getElementById('search-prefix-input').value = '';
             document.getElementById('items-input').value = '';
         }
 
@@ -1517,6 +1562,45 @@
                 console.error('Error updating item:', error);
                 alert('Error updating item');
             }
+        }
+
+        function editCollectionSearchPrefix() {
+            const currentPrefix = currentCollection ? (currentCollection.search_prefix || '') : '';
+            const newPrefix = prompt('Enter YouTube search prefix (e.g., artist name):', currentPrefix);
+            
+            if (newPrefix === null) return; // User cancelled
+            
+            const searchPrefix = newPrefix.trim() || null;
+            
+            fetch(`/api/collections/${currentCollectionId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({search_prefix: searchPrefix})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update current collection data
+                    currentCollection.search_prefix = searchPrefix;
+                    // Update display
+                    const prefixDisplay = document.getElementById('search-prefix-value');
+                    if (prefixDisplay) {
+                        prefixDisplay.textContent = searchPrefix || 'None';
+                    }
+                    // Reload rankings to update search links
+                    loadRankings();
+                    // Reload matchup if it's visible to update search links
+                    if (!document.getElementById('matchup-section').classList.contains('hidden')) {
+                        loadNextMatchup();
+                    }
+                } else {
+                    alert('Error updating search prefix');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating search prefix:', error);
+                alert('Error updating search prefix');
+            });
         }
     </script>
 </body>
