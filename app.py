@@ -51,6 +51,7 @@ class Item(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'), nullable=False)
     name = db.Column(db.String(500), nullable=False)
+    media_link = db.Column(db.String(1000), nullable=True)  # YouTube or other media link
     points = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
@@ -107,6 +108,7 @@ def get_collection(collection_id):
         'items': [{
             'id': item.id,
             'name': item.name,
+            'media_link': item.media_link,
             'points': item.points
         } for item in items],
         'comparisons_count': len(collection.comparisons)
@@ -125,8 +127,16 @@ def get_next_matchup(collection_id):
     
     if matchup:
         return jsonify({
-            'item1': {'id': matchup[0].id, 'name': matchup[0].name},
-            'item2': {'id': matchup[1].id, 'name': matchup[1].name}
+            'item1': {
+                'id': matchup[0].id,
+                'name': matchup[0].name,
+                'media_link': matchup[0].media_link
+            },
+            'item2': {
+                'id': matchup[1].id,
+                'name': matchup[1].name,
+                'media_link': matchup[1].media_link
+            }
         })
     else:
         return jsonify({'message': 'All comparisons completed'}), 200
@@ -210,11 +220,35 @@ def add_items(collection_id):
     items_list = [item.strip() for item in items_text.split('\n') if item.strip()]
     
     for item_name in items_list:
-        item = Item(collection_id=collection_id, name=item_name)
+        item = Item(collection_id=collection_id, name=item_name, media_link=None)
         db.session.add(item)
     
     db.session.commit()
     return jsonify({'success': True, 'added': len(items_list)})
+
+@app.route('/api/items/<int:item_id>', methods=['PUT', 'PATCH'])
+def update_item(item_id):
+    item = Item.query.get_or_404(item_id)
+    data = request.json
+    
+    if 'name' in data:
+        item.name = data['name'].strip()
+    if 'media_link' in data:
+        # Allow empty string to clear media link
+        media_link = data['media_link'].strip() if data['media_link'] else None
+        item.media_link = media_link
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'item': {
+            'id': item.id,
+            'name': item.name,
+            'media_link': item.media_link,
+            'points': item.points
+        }
+    })
 
 @app.route('/api/collections/<int:collection_id>', methods=['DELETE'])
 def delete_collection(collection_id):
@@ -274,6 +308,21 @@ def get_smart_matchup(collection):
 # Initialize database
 with app.app_context():
     db.create_all()
+    
+    # Migration: Add media_link column if it doesn't exist (for existing databases)
+    try:
+        from sqlalchemy import inspect, text
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('item')]
+        if 'media_link' not in columns:
+            # Add the column if it doesn't exist
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE item ADD COLUMN media_link VARCHAR(1000)'))
+                conn.commit()
+            print("✓ Added media_link column to existing database")
+    except Exception as e:
+        # If migration fails, it's likely a new database or the column already exists
+        pass
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

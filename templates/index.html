@@ -295,6 +295,80 @@
             padding: 20px;
             color: #666;
         }
+
+        .matchup-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .matchup-item-content {
+            flex: 1;
+        }
+
+        .video-container {
+            width: 100%;
+            max-width: 560px;
+            margin: 15px auto;
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            overflow: hidden;
+        }
+
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .item-actions button {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .edit-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .edit-form input {
+            flex: 1;
+            padding: 8px;
+            font-size: 0.9em;
+        }
+
+        .add-items-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #ddd;
+        }
+
+        .media-link-display {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .media-link-display a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .media-link-display a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -341,6 +415,16 @@
 
             <div id="rankings-section" class="card hidden">
                 <h3 class="section-title">Current Rankings</h3>
+                
+                <div class="add-items-section">
+                    <h4 style="margin-bottom: 10px; color: #667eea;">Add New Items</h4>
+                    <div class="form-group">
+                        <label for="new-items-input">Items (one per line):</label>
+                        <textarea id="new-items-input" placeholder="Enter new items, one per line..."></textarea>
+                    </div>
+                    <button onclick="addItemsToCollection()">Add Items</button>
+                </div>
+
                 <ul id="rankings-list" class="rankings-list"></ul>
             </div>
         </div>
@@ -473,13 +557,23 @@
                     return;
                 }
                 
+                // Build video embeds if media links exist
+                const video1 = data.item1.media_link ? getYouTubeEmbed(data.item1.media_link) : '';
+                const video2 = data.item2.media_link ? getYouTubeEmbed(data.item2.media_link) : '';
+                
                 container.innerHTML = `
                     <div class="matchup-item" onclick="selectMatchup('item1')" id="item1-select">
-                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.item1.name)}</div>
+                        <div class="matchup-item-content">
+                            <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.item1.name)}</div>
+                            ${video1}
+                        </div>
                     </div>
                     <div class="matchup-vs">VS</div>
                     <div class="matchup-item" onclick="selectMatchup('item2')" id="item2-select">
-                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.item2.name)}</div>
+                        <div class="matchup-item-content">
+                            <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.item2.name)}</div>
+                            ${video2}
+                        </div>
                     </div>
                     <div style="width: 100%;"></div>
                     <div class="matchup-buttons">
@@ -493,7 +587,9 @@
                     item1_id: data.item1.id,
                     item2_id: data.item2.id,
                     item1_name: data.item1.name,
-                    item2_name: data.item2.name
+                    item2_name: data.item2.name,
+                    item1_media_link: data.item1.media_link,
+                    item2_media_link: data.item2.media_link
                 };
             } catch (error) {
                 console.error('Error loading matchup:', error);
@@ -569,7 +665,7 @@
                         <div class="label">Max Comparisons</div>
                     </div>
                     <div class="stat-card">
-                        <div class="value">${Math.round((totalComparisons / maxComparisons) * 100)}%</div>
+                        <div class="value">${maxComparisons > 0 ? Math.round((totalComparisons / maxComparisons) * 100) : 0}%</div>
                         <div class="label">Progress</div>
                     </div>
                 `;
@@ -577,10 +673,30 @@
                 collection.items.forEach((item, index) => {
                     const li = document.createElement('li');
                     const pointsClass = item.points > 0 ? 'positive' : item.points < 0 ? 'negative' : '';
+                    const editingId = `item-${item.id}`;
+                    
                     li.innerHTML = `
-                        <span class="rank-number">#${index + 1}</span>
-                        <span class="item-name">${escapeHtml(item.name)}</span>
-                        <span class="item-points ${pointsClass}">${item.points > 0 ? '+' : ''}${item.points} pts</span>
+                        <div style="flex: 1; display: flex; flex-direction: column;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span class="rank-number">#${index + 1}</span>
+                                <span class="item-name" id="item-name-${item.id}">${escapeHtml(item.name)}</span>
+                                <span class="item-points ${pointsClass}">${item.points > 0 ? '+' : ''}${item.points} pts</span>
+                            </div>
+                            <div id="item-edit-${item.id}" class="hidden">
+                                <div class="edit-form">
+                                    <input type="text" id="item-name-input-${item.id}" value="${escapeHtml(item.name)}" placeholder="Item name">
+                                    <input type="text" id="item-media-input-${item.id}" value="${item.media_link || ''}" placeholder="YouTube link (optional)">
+                                    <button onclick="saveItemEdit(${item.id})">Save</button>
+                                    <button class="secondary" onclick="cancelItemEdit(${item.id})">Cancel</button>
+                                </div>
+                            </div>
+                            <div id="item-display-${item.id}">
+                                ${item.media_link ? `<div class="media-link-display">📎 <a href="${escapeHtml(item.media_link)}" target="_blank">${escapeHtml(item.media_link)}</a></div>` : ''}
+                                <div class="item-actions">
+                                    <button onclick="editItem(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">✏️ Edit</button>
+                                </div>
+                            </div>
+                        </div>
                     `;
                     listEl.appendChild(li);
                 });
@@ -616,9 +732,121 @@
         }
 
         function escapeHtml(text) {
+            if (!text) return '';
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function getYouTubeEmbed(url) {
+            if (!url) return '';
+            
+            // Extract YouTube video ID from various URL formats
+            let videoId = null;
+            
+            // Standard formats: https://www.youtube.com/watch?v=VIDEO_ID
+            // or https://youtu.be/VIDEO_ID
+            // or https://www.youtube.com/embed/VIDEO_ID
+            const patterns = [
+                /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+                /^([a-zA-Z0-9_-]{11})$/ // Just the video ID
+            ];
+            
+            for (const pattern of patterns) {
+                const match = url.match(pattern);
+                if (match) {
+                    videoId = match[1];
+                    break;
+                }
+            }
+            
+            if (!videoId) {
+                // If not a YouTube URL, return as a link
+                return `<div class="media-link-display" style="margin-top: 10px;">
+                    <a href="${escapeHtml(url)}" target="_blank">🔗 Open Media Link</a>
+                </div>`;
+            }
+            
+            return `<div class="video-container">
+                <iframe src="https://www.youtube.com/embed/${videoId}" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+                </iframe>
+            </div>`;
+        }
+
+        function editItem(itemId) {
+            document.getElementById(`item-display-${itemId}`).classList.add('hidden');
+            document.getElementById(`item-edit-${itemId}`).classList.remove('hidden');
+        }
+
+        function cancelItemEdit(itemId) {
+            document.getElementById(`item-display-${itemId}`).classList.remove('hidden');
+            document.getElementById(`item-edit-${itemId}`).classList.add('hidden');
+        }
+
+        async function saveItemEdit(itemId) {
+            const nameInput = document.getElementById(`item-name-input-${itemId}`);
+            const mediaInput = document.getElementById(`item-media-input-${itemId}`);
+            
+            const name = nameInput.value.trim();
+            const mediaLink = mediaInput.value.trim();
+            
+            if (!name) {
+                alert('Item name cannot be empty');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/items/${itemId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        name: name,
+                        media_link: mediaLink || null
+                    })
+                });
+                
+                if (response.ok) {
+                    // Reload rankings to reflect changes
+                    await loadRankings();
+                } else {
+                    alert('Error updating item');
+                }
+            } catch (error) {
+                console.error('Error updating item:', error);
+                alert('Error updating item');
+            }
+        }
+
+        async function addItemsToCollection() {
+            const itemsInput = document.getElementById('new-items-input');
+            const itemsText = itemsInput.value.trim();
+            
+            if (!itemsText) {
+                alert('Please enter at least one item');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}/items`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({items: itemsText})
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    itemsInput.value = '';
+                    alert(`Successfully added ${data.added} item(s)`);
+                    await loadRankings(); // Refresh rankings
+                } else {
+                    alert('Error adding items');
+                }
+            } catch (error) {
+                console.error('Error adding items:', error);
+                alert('Error adding items');
+            }
         }
     </script>
 </body>
