@@ -513,13 +513,27 @@ def get_smart_matchup(collection):
     Uses a smart approach to find the next comparison to make.
     Prioritizes comparisons that will help resolve the ranking order.
     Similar to merge sort, we focus on items that are close in rank.
+    
+    Selection criteria (in order):
+    1. Prefer items with similar scores (lower score difference)
+    2. For equivalent scores, prefer items with fewer total comparisons
+    3. For still equivalent items, randomize to get better distribution
     """
+    import random
+    
     items = list(collection.items)
     comparisons = {frozenset({c.item1_id, c.item2_id}): c.result 
                    for c in collection.comparisons}
     
     if len(items) < 2:
         return None
+    
+    # Count comparisons per item
+    item_comparison_counts = {}
+    for item in items:
+        item_comparison_counts[item.id] = sum(
+            1 for c in comparisons.keys() if item.id in c
+        )
     
     # Get all possible matchups
     possible_matchups = []
@@ -534,26 +548,56 @@ def get_smart_matchup(collection):
             
             # Calculate priority: prefer comparing items with similar scores
             score_diff = abs(item1.points - item2.points)
-            # Lower score difference = higher priority (closer in rank)
-            # Also prefer items that have fewer comparisons so far
             
-            item1_comparisons = sum(1 for c in comparisons.keys() if item1.id in c)
-            item2_comparisons = sum(1 for c in comparisons.keys() if item2.id in c)
+            # Count comparisons for each item
+            item1_comparisons = item_comparison_counts.get(item1.id, 0)
+            item2_comparisons = item_comparison_counts.get(item2.id, 0)
             total_comparisons = item1_comparisons + item2_comparisons
+            max_comparisons = max(item1_comparisons, item2_comparisons)
             
-            # Priority: lower score difference and fewer total comparisons
-            priority = score_diff * 1000 - total_comparisons
+            # Priority tuple: (score_diff, max_comparisons, total_comparisons, random)
+            # Lower values = higher priority
+            # We use random as tiebreaker to get better distribution
+            random_tiebreaker = random.random()
             
-            possible_matchups.append((priority, (item1, item2)))
+            priority_tuple = (
+                score_diff,      # Primary: score difference
+                max_comparisons, # Secondary: max comparisons (prefer items with fewer)
+                total_comparisons, # Tertiary: total comparisons
+                random_tiebreaker # Quaternary: random for distribution
+            )
+            
+            possible_matchups.append((priority_tuple, (item1, item2)))
     
     if not possible_matchups:
         return None
     
-    # Sort by priority (lower is better)
+    # Sort by priority tuple (lower is better)
+    # Tuple comparison works element-wise, so this sorts correctly
     possible_matchups.sort(key=lambda x: x[0])
     
-    # Return the highest priority matchup
-    return possible_matchups[0][1]
+    # Group by primary criteria (score_diff)
+    # x[0] is the priority tuple, x[0][0] is score_diff
+    best_score_diff = possible_matchups[0][0][0]
+    best_matchups = [m for m in possible_matchups if m[0][0] == best_score_diff]
+    
+    # If multiple matchups with same score diff, filter by max_comparisons
+    if len(best_matchups) > 1:
+        best_matchups.sort(key=lambda x: x[0][1])  # Sort by max_comparisons
+        best_max_comparisons = best_matchups[0][0][1]
+        best_matchups = [m for m in best_matchups if m[0][1] == best_max_comparisons]
+    
+    # If still multiple matchups, filter by total_comparisons
+    if len(best_matchups) > 1:
+        best_matchups.sort(key=lambda x: x[0][2])  # Sort by total_comparisons
+        best_total_comparisons = best_matchups[0][0][2]
+        best_matchups = [m for m in best_matchups if m[0][2] == best_total_comparisons]
+    
+    # If still multiple, use random selection from the best group
+    selected = random.choice(best_matchups)
+    
+    # Return the matchup (item1, item2)
+    return selected[1]
 
 # Initialize database
 with app.app_context():

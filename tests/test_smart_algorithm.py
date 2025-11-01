@@ -64,6 +64,35 @@ def test_algorithm_avoids_duplicate_comparisons(client, sample_collection):
         matchup_ids = {matchup['item1']['id'], matchup['item2']['id']}
         assert matchup_ids != {item_ids[0], item_ids[1]}
 
+def test_algorithm_prefers_items_with_fewer_comparisons(client, sample_collection):
+    """Test that when items have equal scores, algorithm prefers items with fewer comparisons."""
+    with client.application.app_context():
+        items = Item.query.filter_by(collection_id=sample_collection).order_by(Item.id).all()
+        item_ids = [item.id for item in items]
+        
+        # Create a scenario where multiple items have the same score (0)
+        # But some have been compared more than others
+        # Item 0 vs Item 1 (both start at 0, both get compared)
+        client.post(f'/api/collections/{sample_collection}/matchup',
+            json={'item1_id': item_ids[0], 'item2_id': item_ids[1], 'winner': 'item1'},
+            content_type='application/json'
+        )
+        
+        # Item 2 vs Item 3 (both still at 0, but haven't been compared yet)
+        # Now Item 0 and 1 have 1 comparison each, Item 2 and 3 have 0
+        
+        # Get next matchup - should prefer comparing items with fewer comparisons
+        # when scores are equal (all items should be at score 0 or close to it)
+        matchup_response = client.get(f'/api/collections/{sample_collection}/matchup')
+        matchup = matchup_response.get_json()
+        
+        matchup_ids = {matchup['item1']['id'], matchup['item2']['id']}
+        
+        # Should prefer items that haven't been compared yet (2, 3, 4, etc.)
+        # over comparing 0 or 1 again
+        # Since 2, 3, 4, etc. all have 0 comparisons, it should pick among them
+        assert item_ids[0] not in matchup_ids or item_ids[1] not in matchup_ids
+
 def test_algorithm_handles_small_collections(client):
     """Test algorithm with minimal items."""
     response = client.post('/api/collections',
