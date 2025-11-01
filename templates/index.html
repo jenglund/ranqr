@@ -369,6 +369,54 @@
         .media-link-display a:hover {
             text-decoration: underline;
         }
+
+        .vote-item-card {
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .vote-item-card:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .vote-item-card.win {
+            border-left-color: #28a745;
+        }
+
+        .vote-item-card.loss {
+            border-left-color: #dc3545;
+        }
+
+        .vote-item-card.tie {
+            border-left-color: #6c757d;
+        }
+
+        .vote-item-name {
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .vote-item-action {
+            color: #667eea;
+            font-size: 0.9em;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .vote-item-action:hover {
+            background: #667eea;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -460,6 +508,56 @@
                 <div style="display: flex; gap: 10px;">
                     <button onclick="importCollection()">Import</button>
                     <button class="secondary" onclick="hideImportDialog()">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Voting History Dialog -->
+        <div id="votes-dialog" class="hidden" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+            <div class="card" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 class="section-title" style="margin: 0;" id="votes-item-name"></h3>
+                    <button class="secondary" onclick="hideVotesDialog()">✕ Close</button>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                        <div class="stat-card" style="min-width: 120px;">
+                            <div class="value" id="votes-wins-count">0</div>
+                            <div class="label">Wins</div>
+                        </div>
+                        <div class="stat-card" style="min-width: 120px;">
+                            <div class="value" id="votes-losses-count">0</div>
+                            <div class="label">Losses</div>
+                        </div>
+                        <div class="stat-card" style="min-width: 120px;">
+                            <div class="value" id="votes-ties-count">0</div>
+                            <div class="label">Ties</div>
+                        </div>
+                        <div class="stat-card" style="min-width: 120px;">
+                            <div class="value" id="votes-points">0</div>
+                            <div class="label">Points</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <button class="danger" onclick="resetItemVotes()" id="reset-votes-btn">🔄 Reset All Votes</button>
+                </div>
+                
+                <div id="votes-wins-section" style="margin-bottom: 20px;">
+                    <h4 style="color: #28a745; margin-bottom: 10px;">✓ Won Against</h4>
+                    <div id="votes-wins-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                </div>
+                
+                <div id="votes-losses-section" style="margin-bottom: 20px;">
+                    <h4 style="color: #dc3545; margin-bottom: 10px;">✗ Lost Against</h4>
+                    <div id="votes-losses-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                </div>
+                
+                <div id="votes-ties-section">
+                    <h4 style="color: #6c757d; margin-bottom: 10px;">= Tied With</h4>
+                    <div id="votes-ties-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
                 </div>
             </div>
         </div>
@@ -732,6 +830,7 @@
                                 })() : ''}
                                 <div class="item-actions">
                                     <button onclick="editItem(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">✏️ Edit</button>
+                                    <button onclick="viewItemVotes(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">📊 View Votes</button>
                                 </div>
                             </div>
                         </div>
@@ -1087,6 +1186,186 @@
             } catch (error) {
                 console.error('Error importing collection:', error);
                 alert('Error importing collection. Please check the JSON format.');
+            }
+        }
+
+        let currentVotesItemId = null;
+
+        async function viewItemVotes(itemId) {
+            currentVotesItemId = itemId;
+            
+            try {
+                const response = await fetch(`/api/items/${itemId}/votes`);
+                if (!response.ok) {
+                    alert('Error loading voting history');
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                // Update dialog header
+                document.getElementById('votes-item-name').textContent = `Voting History: ${data.item.name}`;
+                document.getElementById('votes-wins-count').textContent = data.wins.length;
+                document.getElementById('votes-losses-count').textContent = data.losses.length;
+                document.getElementById('votes-ties-count').textContent = data.ties.length;
+                document.getElementById('votes-points').textContent = data.item.points;
+                
+                // Render wins
+                const winsList = document.getElementById('votes-wins-list');
+                winsList.innerHTML = '';
+                if (data.wins.length === 0) {
+                    winsList.innerHTML = '<p style="color: #666; font-style: italic;">No wins yet</p>';
+                } else {
+                    data.wins.forEach(win => {
+                        const card = document.createElement('div');
+                        card.className = 'vote-item-card win';
+                        card.innerHTML = `
+                            <span class="vote-item-name">${escapeHtml(win.other_item_name)}</span>
+                            <span class="vote-item-action" onclick="changeVote(${itemId}, ${win.other_item_id}, event)">Change Vote</span>
+                        `;
+                        winsList.appendChild(card);
+                    });
+                }
+                
+                // Render losses
+                const lossesList = document.getElementById('votes-losses-list');
+                lossesList.innerHTML = '';
+                if (data.losses.length === 0) {
+                    lossesList.innerHTML = '<p style="color: #666; font-style: italic;">No losses yet</p>';
+                } else {
+                    data.losses.forEach(loss => {
+                        const card = document.createElement('div');
+                        card.className = 'vote-item-card loss';
+                        card.innerHTML = `
+                            <span class="vote-item-name">${escapeHtml(loss.other_item_name)}</span>
+                            <span class="vote-item-action" onclick="changeVote(${itemId}, ${loss.other_item_id}, event)">Change Vote</span>
+                        `;
+                        lossesList.appendChild(card);
+                    });
+                }
+                
+                // Render ties
+                const tiesList = document.getElementById('votes-ties-list');
+                tiesList.innerHTML = '';
+                if (data.ties.length === 0) {
+                    tiesList.innerHTML = '<p style="color: #666; font-style: italic;">No ties yet</p>';
+                } else {
+                    data.ties.forEach(tie => {
+                        const card = document.createElement('div');
+                        card.className = 'vote-item-card tie';
+                        card.innerHTML = `
+                            <span class="vote-item-name">${escapeHtml(tie.other_item_name)}</span>
+                            <span class="vote-item-action" onclick="changeVote(${itemId}, ${tie.other_item_id}, event)">Change Vote</span>
+                        `;
+                        tiesList.appendChild(card);
+                    });
+                }
+                
+                // Show dialog
+                document.getElementById('votes-dialog').classList.remove('hidden');
+                document.getElementById('votes-dialog').style.display = 'flex';
+            } catch (error) {
+                console.error('Error loading voting history:', error);
+                alert('Error loading voting history');
+            }
+        }
+
+        function hideVotesDialog() {
+            document.getElementById('votes-dialog').classList.add('hidden');
+            document.getElementById('votes-dialog').style.display = 'none';
+            currentVotesItemId = null;
+        }
+
+        async function changeVote(itemXId, itemYId, event) {
+            if (event) event.stopPropagation();
+            
+            // Get item names for better prompt
+            const collectionResponse = await fetch(`/api/collections/${currentCollectionId}`);
+            const collection = await collectionResponse.json();
+            const itemX = collection.items.find(i => i.id === itemXId);
+            const itemY = collection.items.find(i => i.id === itemYId);
+            
+            const itemXName = itemX ? itemX.name : 'Item X';
+            const itemYName = itemY ? itemY.name : 'Item Y';
+            
+            // Show a simple prompt to change the vote
+            const newResult = prompt(`Change vote between:\n"${itemXName}" vs "${itemYName}"\n\n1 = "${itemXName}" wins\n2 = "${itemYName}" wins\n3 = Tie\n\nEnter 1, 2, or 3:`);
+            
+            if (!newResult) return;
+            
+            let winner;
+            if (newResult === '1') {
+                winner = 'item1'; // X wins
+            } else if (newResult === '2') {
+                winner = 'item2'; // Y wins
+            } else if (newResult === '3') {
+                winner = 'tie';
+            } else {
+                alert('Invalid choice. Please enter 1, 2, or 3.');
+                return;
+            }
+            
+            // Determine which is item1 and item2 for the API
+            const item1_id = Math.min(itemXId, itemYId);
+            const item2_id = Math.max(itemXId, itemYId);
+            
+            // Adjust winner if IDs were swapped
+            let adjustedWinner = winner;
+            if (itemXId > itemYId) {
+                if (winner === 'item1') {
+                    adjustedWinner = 'item2';
+                } else if (winner === 'item2') {
+                    adjustedWinner = 'item1';
+                }
+            }
+            
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}/matchup`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        item1_id: item1_id,
+                        item2_id: item2_id,
+                        winner: adjustedWinner
+                    })
+                });
+                
+                if (response.ok) {
+                    // Refresh voting history and rankings
+                    await viewItemVotes(itemXId);
+                    await loadRankings();
+                } else {
+                    alert('Error updating vote');
+                }
+            } catch (error) {
+                console.error('Error updating vote:', error);
+                alert('Error updating vote');
+            }
+        }
+
+        async function resetItemVotes() {
+            if (!currentVotesItemId) return;
+            
+            if (!confirm('Are you sure you want to reset all votes for this item? This will remove all comparisons involving this item and cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/items/${currentVotesItemId}/votes`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Successfully reset ${result.comparisons_reset} comparison(s).`);
+                    hideVotesDialog();
+                    await loadRankings(); // Refresh rankings
+                } else {
+                    alert('Error resetting votes');
+                }
+            } catch (error) {
+                console.error('Error resetting votes:', error);
+                alert('Error resetting votes');
             }
         }
     </script>

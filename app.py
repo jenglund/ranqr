@@ -276,6 +276,125 @@ def update_item(item_id):
         }
     })
 
+@app.route('/api/items/<int:item_id>/votes', methods=['GET'])
+def get_item_votes(item_id):
+    """Get voting history for an item - wins, losses, and ties."""
+    item = Item.query.get_or_404(item_id)
+    
+    # Get all comparisons involving this item
+    comparisons_as_item1 = Comparison.query.filter_by(item1_id=item.id).all()
+    comparisons_as_item2 = Comparison.query.filter_by(item2_id=item.id).all()
+    
+    wins = []
+    losses = []
+    ties = []
+    
+    # Process comparisons where item is item1
+    for comp in comparisons_as_item1:
+        other_item = db.session.get(Item, comp.item2_id)
+        if not other_item:
+            continue
+        
+        comparison_data = {
+            'other_item_id': other_item.id,
+            'other_item_name': other_item.name,
+            'other_item_media_link': other_item.media_link,
+            'comparison_id': comp.id
+        }
+        
+        if comp.result == 'item1':
+            wins.append(comparison_data)
+        elif comp.result == 'item2':
+            losses.append(comparison_data)
+        elif comp.result == 'tie':
+            ties.append(comparison_data)
+    
+    # Process comparisons where item is item2
+    for comp in comparisons_as_item2:
+        other_item = db.session.get(Item, comp.item1_id)
+        if not other_item:
+            continue
+        
+        comparison_data = {
+            'other_item_id': other_item.id,
+            'other_item_name': other_item.name,
+            'other_item_media_link': other_item.media_link,
+            'comparison_id': comp.id
+        }
+        
+        if comp.result == 'item1':
+            losses.append(comparison_data)
+        elif comp.result == 'item2':
+            wins.append(comparison_data)
+        elif comp.result == 'tie':
+            ties.append(comparison_data)
+    
+    return jsonify({
+        'item': {
+            'id': item.id,
+            'name': item.name,
+            'media_link': item.media_link,
+            'points': item.points
+        },
+        'wins': wins,
+        'losses': losses,
+        'ties': ties
+    })
+
+@app.route('/api/items/<int:item_id>/votes', methods=['DELETE'])
+def reset_item_votes(item_id):
+    """Reset all votes for an item - remove all comparisons involving this item."""
+    item = Item.query.get_or_404(item_id)
+    collection_id = item.collection_id
+    
+    # Get all comparisons involving this item
+    comparisons_as_item1 = Comparison.query.filter_by(item1_id=item.id).all()
+    comparisons_as_item2 = Comparison.query.filter_by(item2_id=item.id).all()
+    
+    reset_count = 0
+    
+    # Reset points for comparisons where item is item1
+    for comp in comparisons_as_item1:
+        other_item = db.session.get(Item, comp.item2_id)
+        if other_item:
+            # Reverse point adjustments
+            if comp.result == 'item1':
+                item.points -= 1
+                other_item.points += 1
+            elif comp.result == 'item2':
+                item.points += 1
+                other_item.points -= 1
+            # Ties don't affect points
+        db.session.delete(comp)
+        reset_count += 1
+    
+    # Reset points for comparisons where item is item2
+    for comp in comparisons_as_item2:
+        other_item = db.session.get(Item, comp.item1_id)
+        if other_item:
+            # Reverse point adjustments
+            if comp.result == 'item1':
+                item.points += 1
+                other_item.points -= 1
+            elif comp.result == 'item2':
+                item.points -= 1
+                other_item.points += 1
+            # Ties don't affect points
+        db.session.delete(comp)
+        reset_count += 1
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'comparisons_reset': reset_count,
+        'item': {
+            'id': item.id,
+            'name': item.name,
+            'points': item.points
+        }
+    })
+
 @app.route('/api/collections/<int:collection_id>', methods=['DELETE'])
 def delete_collection(collection_id):
     collection = Collection.query.get_or_404(collection_id)
