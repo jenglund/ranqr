@@ -72,6 +72,11 @@ This approach significantly reduces the number of comparisons needed compared to
 
 Your collections and rankings are stored in SQLite database files in the `./data/` directory. This directory is mounted as a volume, so your data persists even if you rebuild the container.
 
+**Note:** The `./data/` directory will be created automatically when you first run the application. If you encounter permission issues, ensure the directory exists and has appropriate permissions:
+```bash
+mkdir -p data
+```
+
 ## Testing
 
 The application includes comprehensive tests to verify functionality and catch syntax errors. Run tests with:

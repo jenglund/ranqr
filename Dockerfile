@@ -18,7 +18,7 @@ EXPOSE 5000
 # Set environment variables
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
-ENV DATABASE_URL=sqlite:///data/ranqr.db
+ENV DATABASE_URL=sqlite:////app/data/ranqr.db
 
 # Run the application
 CMD ["python", "app.py"]

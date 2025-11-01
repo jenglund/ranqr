@@ -4,7 +4,37 @@ from flask_cors import CORS
 import os
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///ranqr.db')
+# Get database URL from environment, default to local database
+db_url = os.environ.get('DATABASE_URL', 'sqlite:///ranqr.db')
+
+# Ensure database directory exists before setting config
+if db_url.startswith('sqlite:///'):
+    # Extract database path from SQLite URI
+    # sqlite:///path -> path, sqlite:////path -> /path (absolute)
+    if db_url.startswith('sqlite:////'):
+        # Absolute path format: sqlite:////absolute/path -> /absolute/path
+        db_path = '/' + db_url[12:]  # Remove 'sqlite:////' and add leading /
+    else:
+        # Relative path format: sqlite:///relative/path -> relative/path
+        db_path = db_url[10:]  # Remove 'sqlite:///'
+        # If it has directory separators, make it absolute relative to app directory
+        if '/' in db_path or '\\' in db_path:
+            if not os.path.isabs(db_path):
+                db_path = os.path.join(os.path.dirname(__file__), db_path)
+            # Convert to absolute path format (4 slashes)
+            db_url = f'sqlite:///{db_path}'
+    
+    # Ensure parent directory exists
+    if db_path:
+        db_dir = os.path.dirname(db_path)
+        if db_dir and db_dir != '/':
+            try:
+                os.makedirs(db_dir, exist_ok=True)
+            except (OSError, PermissionError) as e:
+                # Log but don't fail - might be permission issue
+                print(f"Warning: Could not create database directory {db_dir}: {e}")
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 CORS(app)
@@ -243,9 +273,6 @@ def get_smart_matchup(collection):
 
 # Initialize database
 with app.app_context():
-    # Create data directory if it doesn't exist
-    data_dir = os.path.join(os.path.dirname(__file__), 'data')
-    os.makedirs(data_dir, exist_ok=True)
     db.create_all()
 
 if __name__ == '__main__':
