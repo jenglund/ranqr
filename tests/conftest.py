@@ -1,26 +1,38 @@
 import pytest
 import os
-import tempfile
+
+# CRITICAL: Set TESTING environment variable BEFORE importing app
+# This ensures app.py uses test database configuration and NEVER touches production DB
+# This must happen before any app imports
+os.environ['TESTING'] = '1'
+
 from app import app, db
 
-@pytest.fixture
-def client():
-    """Create a test client with a temporary database."""
-    # Create a temporary database file
-    db_fd, db_path = tempfile.mkstemp(suffix='.db')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-    app.config['TESTING'] = True
+@pytest.fixture(scope='function', autouse=True)
+def test_database():
+    """
+    Create a temporary database for each test function.
+    This ensures tests never touch the production database.
     
+    NOTE: Since TESTING=1 is set before app import, app.py already uses :memory: database.
+    We just need to ensure clean state for each test.
+    """
     with app.app_context():
-        db.create_all()
-    
-    yield app.test_client()
-    
-    # Cleanup
-    with app.app_context():
+        # Drop all tables first to ensure clean state
         db.drop_all()
-    os.close(db_fd)
-    os.unlink(db_path)
+        # Create all tables fresh
+        db.create_all()
+        
+        yield
+        
+        # Cleanup after test
+        db.drop_all()
+        db.session.remove()
+
+@pytest.fixture
+def client(test_database):
+    """Create a test client with a temporary in-memory database."""
+    return app.test_client()
 
 @pytest.fixture
 def sample_collection(client):

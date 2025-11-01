@@ -12,7 +12,7 @@ serve:
 	docker-compose up --build
 
 test: build
-	docker-compose run --rm web pytest
+	docker-compose run --rm -e TESTING=1 web pytest
 
 build:
 	docker-compose build

@@ -5,11 +5,22 @@ import os
 from datetime import datetime
 
 app = Flask(__name__)
+
+# Check if we're in testing mode FIRST - before setting up database
+# This prevents tests from ever touching the production database
+is_testing = os.environ.get('TESTING') == '1'
+
 # Get database URL from environment, default to local database
-db_url = os.environ.get('DATABASE_URL', 'sqlite:///ranqr.db')
+# If testing, use in-memory database to completely isolate tests
+if is_testing:
+    db_url = 'sqlite:///:memory:'
+    app.config['TESTING'] = True
+else:
+    db_url = os.environ.get('DATABASE_URL', 'sqlite:///ranqr.db')
 
 # Ensure database directory exists before setting config
-if db_url.startswith('sqlite:///'):
+# SKIP file system operations when testing (use in-memory database)
+if not is_testing and db_url.startswith('sqlite:///') and ':memory:' not in db_url:
     # Extract database path from SQLite URI
     # sqlite:///path -> path, sqlite:////path -> /path (absolute)
     if db_url.startswith('sqlite:////'):
@@ -599,24 +610,26 @@ def get_smart_matchup(collection):
     # Return the matchup (item1, item2)
     return selected[1]
 
-# Initialize database
-with app.app_context():
-    db.create_all()
-    
-    # Migration: Add media_link column if it doesn't exist (for existing databases)
-    try:
-        from sqlalchemy import inspect, text
-        inspector = inspect(db.engine)
-        columns = [col['name'] for col in inspector.get_columns('item')]
-        if 'media_link' not in columns:
-            # Add the column if it doesn't exist
-            with db.engine.connect() as conn:
-                conn.execute(text('ALTER TABLE item ADD COLUMN media_link VARCHAR(1000)'))
-                conn.commit()
-            print("✓ Added media_link column to existing database")
-    except Exception as e:
-        # If migration fails, it's likely a new database or the column already exists
-        pass
+# Initialize database (only if not in testing mode)
+# This prevents tests from accidentally creating/modifying production database
+if not os.environ.get('TESTING') and not app.config.get('TESTING'):
+    with app.app_context():
+        db.create_all()
+        
+        # Migration: Add media_link column if it doesn't exist (for existing databases)
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('item')]
+            if 'media_link' not in columns:
+                # Add the column if it doesn't exist
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE item ADD COLUMN media_link VARCHAR(1000)'))
+                    conn.commit()
+                print("✓ Added media_link column to existing database")
+        except Exception as e:
+            # If migration fails, it's likely a new database or the column already exists
+            pass
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
