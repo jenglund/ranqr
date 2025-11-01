@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import os
+from datetime import datetime
 
 app = Flask(__name__)
 # Get database URL from environment, default to local database
@@ -281,6 +282,111 @@ def delete_collection(collection_id):
     db.session.delete(collection)
     db.session.commit()
     return jsonify({'success': True})
+
+@app.route('/api/collections/<int:collection_id>/export', methods=['GET'])
+def export_collection(collection_id):
+    """Export a collection as JSON including all items, comparisons, and voting data."""
+    collection = Collection.query.get_or_404(collection_id)
+    
+    # Build export data
+    # Get item names for comparisons
+    items_dict = {item.id: item.name for item in collection.items}
+    
+    export_data = {
+        'version': '1.0',
+        'exported_at': datetime.utcnow().isoformat(),
+        'collection': {
+            'name': collection.name,
+            'created_at': collection.created_at.isoformat() if collection.created_at else None
+        },
+        'items': [{
+            'name': item.name,
+            'media_link': item.media_link,
+            'points': item.points
+        } for item in collection.items],
+        'comparisons': [{
+            'item1_name': items_dict.get(comp.item1_id),
+            'item2_name': items_dict.get(comp.item2_id),
+            'result': comp.result
+        } for comp in collection.comparisons if items_dict.get(comp.item1_id) and items_dict.get(comp.item2_id)]
+    }
+    
+    return jsonify(export_data)
+
+@app.route('/api/collections/import', methods=['POST'])
+def import_collection():
+    """Import a collection from JSON blob, restoring items, comparisons, and voting data."""
+    data = request.json
+    
+    if not data or 'collection' not in data or 'items' not in data:
+        return jsonify({'error': 'Invalid import data. Expected collection, items, and optionally comparisons.'}), 400
+    
+    # Create new collection
+    collection = Collection(name=data['collection']['name'])
+    db.session.add(collection)
+    db.session.flush()  # Get the collection ID
+    
+    # Create name to item mapping for comparisons
+    name_to_item = {}
+    
+    # Import items
+    for item_data in data['items']:
+        item = Item(
+            collection_id=collection.id,
+            name=item_data['name'],
+            media_link=item_data.get('media_link'),
+            points=item_data.get('points', 0)
+        )
+        db.session.add(item)
+        name_to_item[item_data['name']] = item
+    
+    db.session.flush()  # Get item IDs
+    
+    # Import comparisons if they exist
+    comparisons_imported = 0
+    if 'comparisons' in data:
+        for comp_data in data['comparisons']:
+            item1_name = comp_data.get('item1_name')
+            item2_name = comp_data.get('item2_name')
+            result = comp_data.get('result')
+            
+            if not item1_name or not item2_name or not result:
+                continue
+            
+            item1 = name_to_item.get(item1_name)
+            item2 = name_to_item.get(item2_name)
+            
+            # Skip if either item is missing or if it's the same item
+            if not item1 or not item2 or item1.id == item2.id:
+                continue
+            
+            # Ensure consistent ordering (smaller ID first)
+            item1_id, item2_id = item1.id, item2.id
+            if item1_id > item2_id:
+                item1_id, item2_id = item2_id, item1_id
+                # Adjust result if we swapped
+                if result == 'item1':
+                    result = 'item2'
+                elif result == 'item2':
+                    result = 'item1'
+            
+            comparison = Comparison(
+                collection_id=collection.id,
+                item1_id=item1_id,
+                item2_id=item2_id,
+                result=result
+            )
+            db.session.add(comparison)
+            comparisons_imported += 1
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'collection_id': collection.id,
+        'items_imported': len(data['items']),
+        'comparisons_imported': comparisons_imported
+    }), 201
 
 # Smart matchup algorithm (merge-sort-like approach)
 def get_smart_matchup(collection):
