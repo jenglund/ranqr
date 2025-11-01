@@ -691,7 +691,11 @@
                                 </div>
                             </div>
                             <div id="item-display-${item.id}">
-                                ${item.media_link ? `<div class="media-link-display">📎 <a href="${escapeHtml(item.media_link)}" target="_blank">${escapeHtml(item.media_link)}</a></div>` : ''}
+                                ${item.media_link ? (() => {
+                                    const normalizedUrl = normalizeYouTubeUrl(item.media_link);
+                                    const displayText = item.media_link;
+                                    return `<div class="media-link-display">📎 <a href="${escapeHtml(normalizedUrl)}" target="_blank">${escapeHtml(displayText)}</a></div>`;
+                                })() : ''}
                                 <div class="item-actions">
                                     <button onclick="editItem(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">✏️ Edit</button>
                                 </div>
@@ -738,6 +742,28 @@
             return div.innerHTML;
         }
 
+        function normalizeYouTubeUrl(url) {
+            if (!url) return '';
+            
+            const trimmed = url.trim();
+            
+            // If it's already a full URL, return as-is
+            if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                return trimmed;
+            }
+            
+            // Check if it looks like a YouTube video ID (11 characters, alphanumeric + _ and -)
+            const videoIdPattern = /^([a-zA-Z0-9_-]{11})$/;
+            if (videoIdPattern.test(trimmed)) {
+                // Convert video ID to full YouTube URL
+                return `https://www.youtube.com/watch?v=${trimmed}`;
+            }
+            
+            // If it's not a video ID and doesn't have a protocol, assume it's not a valid URL
+            // Return as-is (user might want to fix it)
+            return trimmed;
+        }
+
         function getYouTubeEmbed(url) {
             if (!url) return '';
             
@@ -761,9 +787,10 @@
             }
             
             if (!videoId) {
-                // If not a YouTube URL, return as a link
+                // If not a YouTube URL, normalize it first to ensure it's a valid link
+                const normalizedUrl = normalizeYouTubeUrl(url);
                 return `<div class="media-link-display" style="margin-top: 10px;">
-                    <a href="${escapeHtml(url)}" target="_blank">🔗 Open Media Link</a>
+                    <a href="${escapeHtml(normalizedUrl)}" target="_blank">🔗 Open Media Link</a>
                 </div>`;
             }
             
@@ -790,7 +817,12 @@
             const mediaInput = document.getElementById(`item-media-input-${itemId}`);
             
             const name = nameInput.value.trim();
-            const mediaLink = mediaInput.value.trim();
+            let mediaLink = mediaInput.value.trim();
+            
+            // Normalize YouTube URLs before saving
+            if (mediaLink) {
+                mediaLink = normalizeYouTubeUrl(mediaLink);
+            }
             
             if (!name) {
                 alert('Item name cannot be empty');

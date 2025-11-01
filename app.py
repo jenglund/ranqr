@@ -226,6 +226,28 @@ def add_items(collection_id):
     db.session.commit()
     return jsonify({'success': True, 'added': len(items_list)})
 
+def normalize_youtube_url(url):
+    """Normalize YouTube URLs - convert video IDs to full URLs."""
+    if not url:
+        return None
+    
+    url = url.strip()
+    
+    # If it's already a full URL, return as-is
+    if url.startswith('http://') or url.startswith('https://'):
+        return url
+    
+    # Check if it looks like a YouTube video ID (11 characters, alphanumeric + _ and -)
+    import re
+    video_id_pattern = re.compile(r'^[a-zA-Z0-9_-]{11}$')
+    if video_id_pattern.match(url):
+        # Convert video ID to full YouTube URL
+        return f'https://www.youtube.com/watch?v={url}'
+    
+    # If it's not a video ID and doesn't have a protocol, return as-is
+    # (might be invalid, but let user fix it)
+    return url
+
 @app.route('/api/items/<int:item_id>', methods=['PUT', 'PATCH'])
 def update_item(item_id):
     item = Item.query.get_or_404(item_id)
@@ -236,6 +258,9 @@ def update_item(item_id):
     if 'media_link' in data:
         # Allow empty string to clear media link
         media_link = data['media_link'].strip() if data['media_link'] else None
+        if media_link:
+            # Normalize YouTube URLs
+            media_link = normalize_youtube_url(media_link)
         item.media_link = media_link
     
     db.session.commit()
