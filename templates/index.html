@@ -469,6 +469,10 @@
                 <div id="matchup-container" class="matchup-container">
                     <div class="loading">Loading next matchup...</div>
                 </div>
+                <div id="matchup-edit-section" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
+                    <h4 style="margin-bottom: 15px; color: #667eea;">Edit Items</h4>
+                    <div id="matchup-edit-items" style="display: flex; flex-direction: column; gap: 15px;"></div>
+                </div>
             </div>
 
             <div id="rankings-section" class="card hidden">
@@ -696,14 +700,20 @@
                 container.innerHTML = `
                     <div class="matchup-item" onclick="selectMatchup('item1')" id="item1-select">
                         <div class="matchup-item-content">
-                            <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.item1.name)}</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <div style="font-size: 1.2em; font-weight: bold;">${escapeHtml(data.item1.name)}</div>
+                                <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                            </div>
                             ${video1}
                         </div>
                     </div>
                     <div class="matchup-vs">VS</div>
                     <div class="matchup-item" onclick="selectMatchup('item2')" id="item2-select">
                         <div class="matchup-item-content">
-                            <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.item2.name)}</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <div style="font-size: 1.2em; font-weight: bold;">${escapeHtml(data.item2.name)}</div>
+                                <button onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                            </div>
                             ${video2}
                         </div>
                     </div>
@@ -714,6 +724,9 @@
                         <button onclick="submitMatchup('item2')" id="submit-item2">${escapeHtml(data.item2.name)} Wins</button>
                     </div>
                 `;
+                
+                // Set up edit section for both items
+                setupMatchupEditSection(data.item1, data.item2);
                 
                 window.currentMatchup = {
                     item1_id: data.item1.id,
@@ -1366,6 +1379,131 @@
             } catch (error) {
                 console.error('Error resetting votes:', error);
                 alert('Error resetting votes');
+            }
+        }
+
+        function setupMatchupEditSection(item1, item2) {
+            const editSection = document.getElementById('matchup-edit-section');
+            const editItems = document.getElementById('matchup-edit-items');
+            
+            editItems.innerHTML = `
+                <div id="edit-item-${item1.id}" class="hidden">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea;">
+                        <div style="font-weight: bold; margin-bottom: 10px;">Edit: ${escapeHtml(item1.name)}</div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label>Name:</label>
+                            <input type="text" id="matchup-item-name-${item1.id}" value="${escapeHtml(item1.name)}" style="width: 100%; padding: 8px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label>Media Link (YouTube URL or video ID):</label>
+                            <input type="text" id="matchup-item-media-${item1.id}" value="${item1.media_link || ''}" placeholder="Paste YouTube link here" style="width: 100%; padding: 8px;">
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="saveMatchupItemEdit(${item1.id})">Save</button>
+                            <button class="secondary" onclick="cancelMatchupItemEdit(${item1.id})">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="edit-item-${item2.id}" class="hidden">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea;">
+                        <div style="font-weight: bold; margin-bottom: 10px;">Edit: ${escapeHtml(item2.name)}</div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label>Name:</label>
+                            <input type="text" id="matchup-item-name-${item2.id}" value="${escapeHtml(item2.name)}" style="width: 100%; padding: 8px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label>Media Link (YouTube URL or video ID):</label>
+                            <input type="text" id="matchup-item-media-${item2.id}" value="${item2.media_link || ''}" placeholder="Paste YouTube link here" style="width: 100%; padding: 8px;">
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="saveMatchupItemEdit(${item2.id})">Save</button>
+                            <button class="secondary" onclick="cancelMatchupItemEdit(${item2.id})">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleEditItem(itemId, event) {
+            if (event) event.stopPropagation();
+            
+            const editDiv = document.getElementById(`edit-item-${itemId}`);
+            const editSection = document.getElementById('matchup-edit-section');
+            
+            if (editDiv.classList.contains('hidden')) {
+                // Show this item's edit form, hide others
+                document.querySelectorAll('[id^="edit-item-"]').forEach(el => {
+                    el.classList.add('hidden');
+                });
+                editDiv.classList.remove('hidden');
+                editSection.classList.remove('hidden');
+                
+                // Focus on media link input
+                const mediaInput = document.getElementById(`matchup-item-media-${itemId}`);
+                if (mediaInput) {
+                    setTimeout(() => mediaInput.focus(), 100);
+                }
+            } else {
+                editDiv.classList.add('hidden');
+                // Hide section if no edits are visible
+                const visibleEdits = document.querySelectorAll('[id^="edit-item-"]:not(.hidden)');
+                if (visibleEdits.length === 0) {
+                    editSection.classList.add('hidden');
+                }
+            }
+        }
+
+        function cancelMatchupItemEdit(itemId) {
+            const editDiv = document.getElementById(`edit-item-${itemId}`);
+            const editSection = document.getElementById('matchup-edit-section');
+            editDiv.classList.add('hidden');
+            
+            // Hide section if no edits are visible
+            const visibleEdits = document.querySelectorAll('[id^="edit-item-"]:not(.hidden)');
+            if (visibleEdits.length === 0) {
+                editSection.classList.add('hidden');
+            }
+        }
+
+        async function saveMatchupItemEdit(itemId) {
+            const nameInput = document.getElementById(`matchup-item-name-${itemId}`);
+            const mediaInput = document.getElementById(`matchup-item-media-${itemId}`);
+            
+            const name = nameInput.value.trim();
+            let mediaLink = mediaInput.value.trim();
+            
+            // Normalize YouTube URLs
+            if (mediaLink) {
+                mediaLink = normalizeYouTubeUrl(mediaLink);
+            }
+            
+            if (!name) {
+                alert('Item name cannot be empty');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/items/${itemId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        name: name,
+                        media_link: mediaLink || null
+                    })
+                });
+                
+                if (response.ok) {
+                    // Close edit form
+                    cancelMatchupItemEdit(itemId);
+                    
+                    // Reload matchup to show updated videos/names
+                    await loadNextMatchup();
+                } else {
+                    alert('Error updating item');
+                }
+            } catch (error) {
+                console.error('Error updating item:', error);
+                alert('Error updating item');
             }
         }
     </script>
