@@ -181,8 +181,8 @@ def submit_matchup_result(collection_id):
         db.session.add(comparison)
     
     # Update points
-    item1 = Item.query.get(item1_id)
-    item2 = Item.query.get(item2_id)
+    item1 = db.session.get(Item, item1_id)
+    item2 = db.session.get(Item, item2_id)
     
     # Remove old point adjustments if updating
     if old_result:

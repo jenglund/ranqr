@@ -28,11 +28,16 @@ A web application that helps you rank large collections of items (hundreds to th
    cd ranqr
    ```
 
-2. Build and run with Docker:
+2. Build and run the application:
+   ```bash
+   make serve
+   ```
+   
+   Or using Docker Compose directly:
    ```bash
    docker-compose up --build
    ```
-
+   
    Or using Docker directly:
    ```bash
    docker build -t ranqr .
@@ -82,11 +87,12 @@ mkdir -p data
 The application includes comprehensive tests to verify functionality and catch syntax errors. Run tests with:
 
 ```bash
-# Using docker-compose
-docker-compose run --rm web pytest
-
-# Or using Make (if available)
 make test
+```
+
+Or using Docker Compose directly:
+```bash
+docker-compose run --rm web pytest
 ```
 
 Tests cover:

@@ -134,6 +134,8 @@ def test_rankings_are_sorted_by_points(client, sample_collection):
         assert points == sorted(points, reverse=True)
         
         # First item should have the highest points
-        assert items_data[0]['points'] == 3  # Beat 3 items
-        assert items_data[1]['points'] == 2  # Beat 2 items
+        # item_ids[0] beat 3 items: 3 wins, 0 losses = 3 points
+        assert items_data[0]['points'] == 3
+        # item_ids[1] beat 2 items but lost to item_ids[0]: 2 wins, 1 loss = 1 point
+        assert items_data[1]['points'] == 1
 

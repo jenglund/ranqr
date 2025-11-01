@@ -1,13 +1,21 @@
-.PHONY: test build run clean
+.PHONY: test build serve clean help
 
-test:
+help:
+	@echo "Available targets:"
+	@echo "  make serve    - Build and run the application"
+	@echo "  make test     - Run all tests"
+	@echo "  make build    - Build Docker images"
+	@echo "  make clean    - Stop containers and remove database files"
+	@echo "  make help     - Show this help message"
+
+serve:
+	docker-compose up --build
+
+test: build
 	docker-compose run --rm web pytest
 
 build:
 	docker-compose build
-
-run:
-	docker-compose up
 
 clean:
 	docker-compose down
