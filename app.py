@@ -134,7 +134,43 @@ def get_next_matchup(collection_id):
     if len(items) < 2:
         return jsonify({'error': 'Need at least 2 items for a matchup'}), 400
     
-    # Get smart matchup using merge-sort-like approach
+    # Check if specific item IDs were requested (query parameters)
+    item1_id = request.args.get('item1_id', type=int)
+    item2_id = request.args.get('item2_id', type=int)
+    
+    # If specific items requested, return that matchup
+    if item1_id and item2_id:
+        item1 = db.session.get(Item, item1_id)
+        item2 = db.session.get(Item, item2_id)
+        
+        if not item1 or not item2:
+            return jsonify({'error': 'One or both items not found'}), 404
+        
+        if item1.collection_id != collection_id or item2.collection_id != collection_id:
+            return jsonify({'error': 'Items do not belong to this collection'}), 400
+        
+        if item1_id == item2_id:
+            return jsonify({'error': 'Cannot compare an item with itself'}), 400
+        
+        # Ensure consistent ordering (smaller ID first for display)
+        if item1_id > item2_id:
+            item1, item2 = item2, item1
+            item1_id, item2_id = item2_id, item1_id
+        
+        return jsonify({
+            'item1': {
+                'id': item1.id,
+                'name': item1.name,
+                'media_link': item1.media_link
+            },
+            'item2': {
+                'id': item2.id,
+                'name': item2.name,
+                'media_link': item2.media_link
+            }
+        })
+    
+    # Otherwise, get smart matchup using merge-sort-like approach
     matchup = get_smart_matchup(collection)
     
     if matchup:

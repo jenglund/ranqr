@@ -680,12 +680,18 @@
             await loadRankings();
         }
 
-        async function loadNextMatchup() {
+        async function loadNextMatchup(specificItem1Id = null, specificItem2Id = null) {
             const container = document.getElementById('matchup-container');
             container.innerHTML = '<div class="loading">Loading next matchup...</div>';
             
             try {
-                const response = await fetch(`/api/collections/${currentCollectionId}/matchup`);
+                let url = `/api/collections/${currentCollectionId}/matchup`;
+                // If specific items requested, add them as query parameters
+                if (specificItem1Id && specificItem2Id) {
+                    url += `?item1_id=${specificItem1Id}&item2_id=${specificItem2Id}`;
+                }
+                
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 if (data.message) {
@@ -1496,8 +1502,14 @@
                     // Close edit form
                     cancelMatchupItemEdit(itemId);
                     
-                    // Reload matchup to show updated videos/names
-                    await loadNextMatchup();
+                    // Reload the SAME matchup to show updated videos/names
+                    // Preserve the current matchup instead of getting a new random one
+                    if (window.currentMatchup && window.currentMatchup.item1_id && window.currentMatchup.item2_id) {
+                        await loadNextMatchup(window.currentMatchup.item1_id, window.currentMatchup.item2_id);
+                    } else {
+                        // Fallback to new matchup if current matchup not available
+                        await loadNextMatchup();
+                    }
                 } else {
                     alert('Error updating item');
                 }
