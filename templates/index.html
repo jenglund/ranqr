@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RanQR - Rank Collections by Pairwise Comparisons</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        .matchup-container {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            min-height: 200px;
+        }
+
+        .matchup-item {
+            flex: 1;
+            min-width: 250px;
+            padding: 30px;
+            border: 3px solid #ddd;
+            border-radius: 12px;
+            text-align: center;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .matchup-item:hover {
+            border-color: #667eea;
+            background: #e9ecef;
+            transform: scale(1.05);
+        }
+
+        .matchup-item.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .matchup-vs {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .matchup-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .matchup-buttons button {
+            min-width: 120px;
+        }
+
+        .collections-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .collection-card {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+
+        .collection-card h3 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .collection-card .meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .collection-card .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .collection-card .actions button {
+            flex: 1;
+            padding: 8px;
+            font-size: 0.9em;
+        }
+
+        .rankings-list {
+            list-style: none;
+        }
+
+        .rankings-list li {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .rankings-list li:nth-child(1) {
+            border-left-color: #ffd700;
+            background: linear-gradient(90deg, #fff9e6 0%, #fff 100%);
+        }
+
+        .rankings-list li:nth-child(2) {
+            border-left-color: #c0c0c0;
+            background: linear-gradient(90deg, #f5f5f5 0%, #fff 100%);
+        }
+
+        .rankings-list li:nth-child(3) {
+            border-left-color: #cd7f32;
+            background: linear-gradient(90deg, #f5e6d3 0%, #fff 100%);
+        }
+
+        .rank-number {
+            font-weight: bold;
+            color: #667eea;
+            margin-right: 10px;
+            min-width: 30px;
+        }
+
+        .item-name {
+            flex: 1;
+        }
+
+        .item-points {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .item-points.positive {
+            color: #28a745;
+        }
+
+        .item-points.negative {
+            color: #dc3545;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .view-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .view-controls button {
+            flex: 1;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card .value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .stat-card .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 RanQR - Rank Your Collections</h1>
+
+        <div id="collections-view" class="card">
+            <h2 class="section-title">Your Collections</h2>
+            <div id="collections-list" class="collections-list"></div>
+            
+            <h3 class="section-title" style="margin-top: 30px;">Create New Collection</h3>
+            <div class="form-group">
+                <label for="collection-name">Collection Name:</label>
+                <input type="text" id="collection-name" placeholder="Enter collection name">
+            </div>
+            <div class="form-group">
+                <label for="items-input">Items (one per line):</label>
+                <textarea id="items-input" placeholder="Enter items, one per line..."></textarea>
+            </div>
+            <button onclick="createCollection()">Create Collection</button>
+        </div>
+
+        <div id="collection-view" class="hidden">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 class="section-title" style="margin: 0;" id="collection-title"></h2>
+                    <button class="secondary" onclick="showCollections()">← Back to Collections</button>
+                </div>
+                
+                <div class="view-controls">
+                    <button onclick="showMatchup()">Make Comparisons</button>
+                    <button onclick="showRankings()">View Rankings</button>
+                </div>
+
+                <div id="stats" class="stats hidden"></div>
+            </div>
+
+            <div id="matchup-section" class="card hidden">
+                <h3 class="section-title">Pairwise Comparison</h3>
+                <div id="matchup-container" class="matchup-container">
+                    <div class="loading">Loading next matchup...</div>
+                </div>
+            </div>
+
+            <div id="rankings-section" class="card hidden">
+                <h3 class="section-title">Current Rankings</h3>
+                <ul id="rankings-list" class="rankings-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentCollectionId = null;
+        let currentCollection = null;
+
+        // Initialize
+        window.onload = () => {
+            loadCollections();
+        };
+
+        async function loadCollections() {
+            try {
+                const response = await fetch('/api/collections');
+                const collections = await response.json();
+                
+                const listEl = document.getElementById('collections-list');
+                listEl.innerHTML = '';
+                
+                if (collections.length === 0) {
+                    listEl.innerHTML = '<p style="text-align: center; color: #666;">No collections yet. Create one above!</p>';
+                    return;
+                }
+                
+                collections.forEach(collection => {
+                    const card = document.createElement('div');
+                    card.className = 'collection-card';
+                    card.innerHTML = `
+                        <h3>${escapeHtml(collection.name)}</h3>
+                        <div class="meta">${collection.item_count} items</div>
+                        <div class="actions">
+                            <button onclick="openCollection(${collection.id})">Open</button>
+                            <button class="danger" onclick="deleteCollection(${collection.id})">Delete</button>
+                        </div>
+                    `;
+                    listEl.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error loading collections:', error);
+                alert('Error loading collections');
+            }
+        }
+
+        async function createCollection() {
+            const name = document.getElementById('collection-name').value.trim();
+            const items = document.getElementById('items-input').value.trim();
+            
+            if (!name) {
+                alert('Please enter a collection name');
+                return;
+            }
+            
+            if (!items) {
+                alert('Please enter at least one item');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/collections', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, items})
+                });
+                
+                if (response.ok) {
+                    document.getElementById('collection-name').value = '';
+                    document.getElementById('items-input').value = '';
+                    loadCollections();
+                    const data = await response.json();
+                    openCollection(data.id);
+                } else {
+                    alert('Error creating collection');
+                }
+            } catch (error) {
+                console.error('Error creating collection:', error);
+                alert('Error creating collection');
+            }
+        }
+
+        async function openCollection(id) {
+            currentCollectionId = id;
+            try {
+                const response = await fetch(`/api/collections/${id}`);
+                currentCollection = await response.json();
+                
+                document.getElementById('collections-view').classList.add('hidden');
+                document.getElementById('collection-view').classList.remove('hidden');
+                document.getElementById('collection-title').textContent = currentCollection.name;
+                
+                showRankings();
+            } catch (error) {
+                console.error('Error opening collection:', error);
+                alert('Error opening collection');
+            }
+        }
+
+        function showCollections() {
+            document.getElementById('collections-view').classList.remove('hidden');
+            document.getElementById('collection-view').classList.add('hidden');
+            currentCollectionId = null;
+            currentCollection = null;
+            loadCollections();
+        }
+
+        async function showMatchup() {
+            document.getElementById('matchup-section').classList.remove('hidden');
+            document.getElementById('rankings-section').classList.add('hidden');
+            await loadNextMatchup();
+        }
+
+        async function showRankings() {
+            document.getElementById('matchup-section').classList.add('hidden');
+            document.getElementById('rankings-section').classList.remove('hidden');
+            await loadRankings();
+        }
+
+        async function loadNextMatchup() {
+            const container = document.getElementById('matchup-container');
+            container.innerHTML = '<div class="loading">Loading next matchup...</div>';
+            
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}/matchup`);
+                const data = await response.json();
+                
+                if (data.message) {
+                    container.innerHTML = `<div class="loading">${data.message}</div>`;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="matchup-item" onclick="selectMatchup('item1')" id="item1-select">
+                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.item1.name)}</div>
+                    </div>
+                    <div class="matchup-vs">VS</div>
+                    <div class="matchup-item" onclick="selectMatchup('item2')" id="item2-select">
+                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.item2.name)}</div>
+                    </div>
+                    <div style="width: 100%;"></div>
+                    <div class="matchup-buttons">
+                        <button onclick="submitMatchup('item1')" id="submit-item1">${escapeHtml(data.item1.name)} Wins</button>
+                        <button onclick="submitMatchup('tie')" class="secondary">Tie</button>
+                        <button onclick="submitMatchup('item2')" id="submit-item2">${escapeHtml(data.item2.name)} Wins</button>
+                    </div>
+                `;
+                
+                window.currentMatchup = {
+                    item1_id: data.item1.id,
+                    item2_id: data.item2.id,
+                    item1_name: data.item1.name,
+                    item2_name: data.item2.name
+                };
+            } catch (error) {
+                console.error('Error loading matchup:', error);
+                container.innerHTML = '<div class="loading">Error loading matchup</div>';
+            }
+        }
+
+        function selectMatchup(choice) {
+            document.getElementById('item1-select').classList.remove('selected');
+            document.getElementById('item2-select').classList.remove('selected');
+            
+            if (choice === 'item1') {
+                document.getElementById('item1-select').classList.add('selected');
+            } else {
+                document.getElementById('item2-select').classList.add('selected');
+            }
+        }
+
+        async function submitMatchup(winner) {
+            if (!window.currentMatchup) return;
+            
+            const result = winner === 'item1' ? 'item1' : winner === 'item2' ? 'item2' : 'tie';
+            
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}/matchup`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        item1_id: window.currentMatchup.item1_id,
+                        item2_id: window.currentMatchup.item2_id,
+                        winner: result
+                    })
+                });
+                
+                if (response.ok) {
+                    await loadRankings(); // Update rankings
+                    await loadNextMatchup(); // Load next matchup
+                } else {
+                    alert('Error submitting matchup');
+                }
+            } catch (error) {
+                console.error('Error submitting matchup:', error);
+                alert('Error submitting matchup');
+            }
+        }
+
+        async function loadRankings() {
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}`);
+                const collection = await response.json();
+                
+                const listEl = document.getElementById('rankings-list');
+                listEl.innerHTML = '';
+                
+                const totalItems = collection.items.length;
+                const totalComparisons = collection.comparisons_count;
+                const maxComparisons = (totalItems * (totalItems - 1)) / 2;
+                
+                // Update stats
+                const statsEl = document.getElementById('stats');
+                statsEl.classList.remove('hidden');
+                statsEl.innerHTML = `
+                    <div class="stat-card">
+                        <div class="value">${totalItems}</div>
+                        <div class="label">Total Items</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">${totalComparisons}</div>
+                        <div class="label">Comparisons Made</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">${maxComparisons}</div>
+                        <div class="label">Max Comparisons</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">${Math.round((totalComparisons / maxComparisons) * 100)}%</div>
+                        <div class="label">Progress</div>
+                    </div>
+                `;
+                
+                collection.items.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    const pointsClass = item.points > 0 ? 'positive' : item.points < 0 ? 'negative' : '';
+                    li.innerHTML = `
+                        <span class="rank-number">#${index + 1}</span>
+                        <span class="item-name">${escapeHtml(item.name)}</span>
+                        <span class="item-points ${pointsClass}">${item.points > 0 ? '+' : ''}${item.points} pts</span>
+                    `;
+                    listEl.appendChild(li);
+                });
+            } catch (error) {
+                console.error('Error loading rankings:', error);
+                alert('Error loading rankings');
+            }
+        }
+
+        async function deleteCollection(id) {
+            if (!confirm('Are you sure you want to delete this collection?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/collections/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    if (currentCollectionId === id) {
+                        showCollections();
+                    } else {
+                        loadCollections();
+                    }
+                } else {
+                    alert('Error deleting collection');
+                }
+            } catch (error) {
+                console.error('Error deleting collection:', error);
+                alert('Error deleting collection');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
+

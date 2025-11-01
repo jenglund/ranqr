@@ -1,0 +1,253 @@
+from flask import Flask, render_template, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
+import os
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///ranqr.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+CORS(app)
+
+# Database Models
+class Collection(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    items = db.relationship('Item', backref='collection', lazy=True, cascade='all, delete-orphan')
+    comparisons = db.relationship('Comparison', backref='collection', lazy=True, cascade='all, delete-orphan')
+
+class Item(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'), nullable=False)
+    name = db.Column(db.String(500), nullable=False)
+    points = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+
+class Comparison(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'), nullable=False)
+    item1_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
+    item2_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
+    result = db.Column(db.String(20), nullable=True)  # 'item1', 'item2', or 'tie'
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    
+    __table_args__ = (db.UniqueConstraint('item1_id', 'item2_id', name='unique_comparison'),)
+
+# Routes
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/api/collections', methods=['GET'])
+def get_collections():
+    collections = Collection.query.all()
+    return jsonify([{
+        'id': c.id,
+        'name': c.name,
+        'item_count': len(c.items),
+        'created_at': c.created_at.isoformat() if c.created_at else None
+    } for c in collections])
+
+@app.route('/api/collections', methods=['POST'])
+def create_collection():
+    data = request.json
+    collection = Collection(name=data['name'])
+    db.session.add(collection)
+    db.session.commit()
+    
+    items_text = data.get('items', '')
+    items_list = [item.strip() for item in items_text.split('\n') if item.strip()]
+    
+    for item_name in items_list:
+        item = Item(collection_id=collection.id, name=item_name)
+        db.session.add(item)
+    
+    db.session.commit()
+    return jsonify({'id': collection.id, 'name': collection.name}), 201
+
+@app.route('/api/collections/<int:collection_id>', methods=['GET'])
+def get_collection(collection_id):
+    collection = Collection.query.get_or_404(collection_id)
+    items = sorted(collection.items, key=lambda x: x.points, reverse=True)
+    
+    return jsonify({
+        'id': collection.id,
+        'name': collection.name,
+        'items': [{
+            'id': item.id,
+            'name': item.name,
+            'points': item.points
+        } for item in items],
+        'comparisons_count': len(collection.comparisons)
+    })
+
+@app.route('/api/collections/<int:collection_id>/matchup', methods=['GET'])
+def get_next_matchup(collection_id):
+    collection = Collection.query.get_or_404(collection_id)
+    items = collection.items
+    
+    if len(items) < 2:
+        return jsonify({'error': 'Need at least 2 items for a matchup'}), 400
+    
+    # Get smart matchup using merge-sort-like approach
+    matchup = get_smart_matchup(collection)
+    
+    if matchup:
+        return jsonify({
+            'item1': {'id': matchup[0].id, 'name': matchup[0].name},
+            'item2': {'id': matchup[1].id, 'name': matchup[1].name}
+        })
+    else:
+        return jsonify({'message': 'All comparisons completed'}), 200
+
+@app.route('/api/collections/<int:collection_id>/matchup', methods=['POST'])
+def submit_matchup_result(collection_id):
+    collection = Collection.query.get_or_404(collection_id)
+    data = request.json
+    
+    item1_id = data['item1_id']
+    item2_id = data['item2_id']
+    winner = data.get('winner')  # 'item1', 'item2', or 'tie'
+    
+    # Ensure consistent ordering (always store smaller ID first)
+    if item1_id > item2_id:
+        item1_id, item2_id = item2_id, item1_id
+        if winner == 'item1':
+            winner = 'item2'
+        elif winner == 'item2':
+            winner = 'item1'
+    
+    # Check if comparison already exists
+    comparison = Comparison.query.filter_by(
+        collection_id=collection_id,
+        item1_id=item1_id,
+        item2_id=item2_id
+    ).first()
+    
+    old_result = None
+    if comparison:
+        # Update existing comparison
+        old_result = comparison.result
+        comparison.result = winner
+    else:
+        # Create new comparison
+        comparison = Comparison(
+            collection_id=collection_id,
+            item1_id=item1_id,
+            item2_id=item2_id,
+            result=winner
+        )
+        db.session.add(comparison)
+    
+    # Update points
+    item1 = Item.query.get(item1_id)
+    item2 = Item.query.get(item2_id)
+    
+    # Remove old point adjustments if updating
+    if old_result:
+        if old_result == 'item1':
+            item1.points -= 1
+            item2.points += 1
+        elif old_result == 'item2':
+            item1.points += 1
+            item2.points -= 1
+        elif old_result == 'tie':
+            # Ties don't affect points, but we track them
+            pass
+    
+    # Apply new point adjustments
+    if winner == 'item1':
+        item1.points += 1
+        item2.points -= 1
+    elif winner == 'item2':
+        item1.points -= 1
+        item2.points += 1
+    elif winner == 'tie':
+        # Ties don't change points
+        pass
+    
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/api/collections/<int:collection_id>/items', methods=['POST'])
+def add_items(collection_id):
+    collection = Collection.query.get_or_404(collection_id)
+    data = request.json
+    
+    items_text = data.get('items', '')
+    items_list = [item.strip() for item in items_text.split('\n') if item.strip()]
+    
+    for item_name in items_list:
+        item = Item(collection_id=collection_id, name=item_name)
+        db.session.add(item)
+    
+    db.session.commit()
+    return jsonify({'success': True, 'added': len(items_list)})
+
+@app.route('/api/collections/<int:collection_id>', methods=['DELETE'])
+def delete_collection(collection_id):
+    collection = Collection.query.get_or_404(collection_id)
+    db.session.delete(collection)
+    db.session.commit()
+    return jsonify({'success': True})
+
+# Smart matchup algorithm (merge-sort-like approach)
+def get_smart_matchup(collection):
+    """
+    Uses a smart approach to find the next comparison to make.
+    Prioritizes comparisons that will help resolve the ranking order.
+    Similar to merge sort, we focus on items that are close in rank.
+    """
+    items = list(collection.items)
+    comparisons = {frozenset({c.item1_id, c.item2_id}): c.result 
+                   for c in collection.comparisons}
+    
+    if len(items) < 2:
+        return None
+    
+    # Get all possible matchups
+    possible_matchups = []
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            item1, item2 = items[i], items[j]
+            matchup_key = frozenset({item1.id, item2.id})
+            
+            # Skip if already compared
+            if matchup_key in comparisons:
+                continue
+            
+            # Calculate priority: prefer comparing items with similar scores
+            score_diff = abs(item1.points - item2.points)
+            # Lower score difference = higher priority (closer in rank)
+            # Also prefer items that have fewer comparisons so far
+            
+            item1_comparisons = sum(1 for c in comparisons.keys() if item1.id in c)
+            item2_comparisons = sum(1 for c in comparisons.keys() if item2.id in c)
+            total_comparisons = item1_comparisons + item2_comparisons
+            
+            # Priority: lower score difference and fewer total comparisons
+            priority = score_diff * 1000 - total_comparisons
+            
+            possible_matchups.append((priority, (item1, item2)))
+    
+    if not possible_matchups:
+        return None
+    
+    # Sort by priority (lower is better)
+    possible_matchups.sort(key=lambda x: x[0])
+    
+    # Return the highest priority matchup
+    return possible_matchups[0][1]
+
+# Initialize database
+with app.app_context():
+    # Create data directory if it doesn't exist
+    data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    db.create_all()
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
