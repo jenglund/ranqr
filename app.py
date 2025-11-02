@@ -118,10 +118,87 @@ def create_collection():
     db.session.commit()
     return jsonify({'id': collection.id, 'name': collection.name, 'search_prefix': collection.search_prefix}), 201
 
+def calculate_sub_scores(items_in_group, comparisons):
+    """
+    Calculate sub-scores for items within a tied group based on comparisons
+    that involve ONLY items within that group.
+    
+    Args:
+        items_in_group: List of Item objects with the same main score
+        comparisons: List of all Comparison objects for the collection
+    
+    Returns:
+        Dictionary mapping item_id to sub_score (int)
+    """
+    if len(items_in_group) <= 1:
+        # No comparisons possible with 0 or 1 items
+        return {item.id: 0 for item in items_in_group}
+    
+    # Create set of item IDs in this group for fast lookup
+    group_item_ids = {item.id for item in items_in_group}
+    
+    # Initialize sub-scores to 0
+    sub_scores = {item.id: 0 for item in items_in_group}
+    
+    # Process comparisons that involve ONLY items within this group
+    for comp in comparisons:
+        # Check if both items are in the group
+        if comp.item1_id in group_item_ids and comp.item2_id in group_item_ids:
+            # Calculate sub-score impact (same as main scoring: +1 win, -1 loss, 0 tie)
+            if comp.result == 'item1':
+                sub_scores[comp.item1_id] += 1
+                sub_scores[comp.item2_id] -= 1
+            elif comp.result == 'item2':
+                sub_scores[comp.item1_id] -= 1
+                sub_scores[comp.item2_id] += 1
+            # Ties don't affect sub-scores (already 0)
+    
+    return sub_scores
+
+def sort_items_with_tie_breaking(items, comparisons):
+    """
+    Sort items by points, using sub-scores to break ties.
+    
+    Args:
+        items: List of Item objects to sort
+        comparisons: List of Comparison objects for the collection
+    
+    Returns:
+        Sorted list of Item objects
+    """
+    # First, sort by main points (descending)
+    items_by_points = {}
+    for item in items:
+        if item.points not in items_by_points:
+            items_by_points[item.points] = []
+        items_by_points[item.points].append(item)
+    
+    # Sort point groups in descending order
+    sorted_points = sorted(items_by_points.keys(), reverse=True)
+    
+    # Build final sorted list
+    sorted_items = []
+    for points in sorted_points:
+        group = items_by_points[points]
+        
+        if len(group) == 1:
+            # No tie-breaking needed
+            sorted_items.append(group[0])
+        else:
+            # Calculate sub-scores for this tied group
+            sub_scores = calculate_sub_scores(group, comparisons)
+            
+            # Sort within group by sub-score (descending), then by ID for stability
+            group.sort(key=lambda x: (sub_scores[x.id], -x.id), reverse=True)
+            sorted_items.extend(group)
+    
+    return sorted_items
+
 @app.route('/api/collections/<int:collection_id>', methods=['GET'])
 def get_collection(collection_id):
     collection = Collection.query.get_or_404(collection_id)
-    items = sorted(collection.items, key=lambda x: x.points, reverse=True)
+    # Use tie-breaking sorting algorithm
+    items = sort_items_with_tie_breaking(list(collection.items), list(collection.comparisons))
     
     return jsonify({
         'id': collection.id,
@@ -731,17 +808,18 @@ def import_collection():
         'comparisons_imported': comparisons_imported
     }), 201
 
-# Smart matchup algorithm (merge-sort-like approach)
+# Smart matchup algorithm - prioritizes largest tied groups
 def get_smart_matchup(collection):
     """
     Uses a smart approach to find the next comparison to make.
-    Prioritizes comparisons that will help resolve the ranking order.
-    Similar to merge sort, we focus on items that are close in rank.
+    Prioritizes comparisons within the largest subset of items with the same score.
     
-    Selection criteria (in order):
-    1. Prefer items with similar scores (lower score difference)
-    2. For equivalent scores, prefer items with fewer total comparisons
-    3. For still equivalent items, randomize to get better distribution
+    Selection criteria:
+    1. Find the largest subset of items that have the same score
+    2. If multiple subsets have the same size, prioritize the one with the highest score
+    3. Select matchups from within that subset
+    4. Within the selected subset, prefer items with fewer comparisons
+    5. Randomize for better distribution
     """
     import random
     
@@ -759,19 +837,54 @@ def get_smart_matchup(collection):
             1 for c in comparisons.keys() if item.id in c
         )
     
-    # Get all possible matchups
+    # Group items by score
+    items_by_score = {}
+    for item in items:
+        score = item.points
+        if score not in items_by_score:
+            items_by_score[score] = []
+        items_by_score[score].append(item)
+    
+    # Find the largest subset(s) of items with the same score
+    max_group_size = max(len(group) for group in items_by_score.values())
+    largest_groups = [(score, group) for score, group in items_by_score.items() 
+                      if len(group) == max_group_size]
+    
+    # If multiple groups have the same size, prioritize the one with smallest absolute value
+    # Tie-breaking: 0, then 1, -1, then 2, -2, then 3, -3, etc.
+    # (smallest absolute value first, then positive over negative)
+    def tie_break_key(score_group_pair):
+        score = score_group_pair[0]
+        abs_score = abs(score)
+        # Return tuple: (absolute_value, is_negative)
+        # This sorts: 0, 1, -1, 2, -2, 3, -3, ...
+        return (abs_score, score < 0)
+    
+    largest_groups.sort(key=tie_break_key)
+    target_score, target_group = largest_groups[0]
+    
+    # If the target group has fewer than 2 items, we can't create a matchup from it
+    # This shouldn't happen if we're selecting correctly, but handle it gracefully
+    if len(target_group) < 2:
+        # Fall back to finding any possible matchup
+        for i in range(len(items)):
+            for j in range(i + 1, len(items)):
+                item1, item2 = items[i], items[j]
+                matchup_key = frozenset({item1.id, item2.id})
+                if matchup_key not in comparisons:
+                    return (item1, item2)
+        return None
+    
+    # Get all possible matchups within the target group
     possible_matchups = []
-    for i in range(len(items)):
-        for j in range(i + 1, len(items)):
-            item1, item2 = items[i], items[j]
+    for i in range(len(target_group)):
+        for j in range(i + 1, len(target_group)):
+            item1, item2 = target_group[i], target_group[j]
             matchup_key = frozenset({item1.id, item2.id})
             
             # Skip if already compared
             if matchup_key in comparisons:
                 continue
-            
-            # Calculate priority: prefer comparing items with similar scores
-            score_diff = abs(item1.points - item2.points)
             
             # Count comparisons for each item
             item1_comparisons = item_comparison_counts.get(item1.id, 0)
@@ -779,43 +892,40 @@ def get_smart_matchup(collection):
             total_comparisons = item1_comparisons + item2_comparisons
             max_comparisons = max(item1_comparisons, item2_comparisons)
             
-            # Priority tuple: (score_diff, max_comparisons, total_comparisons, random)
+            # Priority tuple: (max_comparisons, total_comparisons, random)
             # Lower values = higher priority
-            # We use random as tiebreaker to get better distribution
             random_tiebreaker = random.random()
             
             priority_tuple = (
-                score_diff,      # Primary: score difference
-                max_comparisons, # Secondary: max comparisons (prefer items with fewer)
-                total_comparisons, # Tertiary: total comparisons
-                random_tiebreaker # Quaternary: random for distribution
+                max_comparisons,   # Primary: max comparisons (prefer items with fewer)
+                total_comparisons, # Secondary: total comparisons
+                random_tiebreaker  # Tertiary: random for distribution
             )
             
             possible_matchups.append((priority_tuple, (item1, item2)))
     
+    # If no matchups available in target group, look for any unmatched pair
     if not possible_matchups:
+        for i in range(len(items)):
+            for j in range(i + 1, len(items)):
+                item1, item2 = items[i], items[j]
+                matchup_key = frozenset({item1.id, item2.id})
+                if matchup_key not in comparisons:
+                    return (item1, item2)
         return None
     
     # Sort by priority tuple (lower is better)
-    # Tuple comparison works element-wise, so this sorts correctly
     possible_matchups.sort(key=lambda x: x[0])
     
-    # Group by primary criteria (score_diff)
-    # x[0] is the priority tuple, x[0][0] is score_diff
-    best_score_diff = possible_matchups[0][0][0]
-    best_matchups = [m for m in possible_matchups if m[0][0] == best_score_diff]
+    # Group by primary criteria (max_comparisons)
+    best_max_comparisons = possible_matchups[0][0][0]
+    best_matchups = [m for m in possible_matchups if m[0][0] == best_max_comparisons]
     
-    # If multiple matchups with same score diff, filter by max_comparisons
+    # If multiple matchups with same max_comparisons, filter by total_comparisons
     if len(best_matchups) > 1:
-        best_matchups.sort(key=lambda x: x[0][1])  # Sort by max_comparisons
-        best_max_comparisons = best_matchups[0][0][1]
-        best_matchups = [m for m in best_matchups if m[0][1] == best_max_comparisons]
-    
-    # If still multiple matchups, filter by total_comparisons
-    if len(best_matchups) > 1:
-        best_matchups.sort(key=lambda x: x[0][2])  # Sort by total_comparisons
-        best_total_comparisons = best_matchups[0][0][2]
-        best_matchups = [m for m in best_matchups if m[0][2] == best_total_comparisons]
+        best_matchups.sort(key=lambda x: x[0][1])  # Sort by total_comparisons
+        best_total_comparisons = best_matchups[0][0][1]
+        best_matchups = [m for m in best_matchups if m[0][1] == best_total_comparisons]
     
     # If still multiple, use random selection from the best group
     selected = random.choice(best_matchups)
