@@ -122,8 +122,13 @@
             gap: 20px;
             align-items: center;
             justify-content: center;
-            flex-wrap: wrap;
             width: 100%;
+        }
+        
+        @media (max-width: 800px) {
+            .matchup-items-row {
+                flex-direction: column;
+            }
         }
 
         .matchup-item {
@@ -158,10 +163,21 @@
 
         .matchup-buttons {
             display: flex;
-            gap: 10px;
+            gap: 20px;
             justify-content: center;
             margin-top: 20px;
-            flex-wrap: wrap;
+            width: 100%;
+        }
+        
+        @media (max-width: 600px) {
+            .matchup-buttons {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .matchup-buttons button {
+                width: 100%;
+            }
         }
 
         .matchup-buttons button {
