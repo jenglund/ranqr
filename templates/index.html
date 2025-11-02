@@ -129,6 +129,9 @@
             .matchup-items-row {
                 flex-direction: column;
             }
+            .matchup-items-row .matchup-item {
+                width: 100%;
+            }
         }
 
         .matchup-item {
@@ -139,20 +142,7 @@
             border-radius: 12px;
             text-align: center;
             background: #f8f9fa;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .matchup-item:hover {
-            border-color: #667eea;
-            background: #e9ecef;
-            transform: scale(1.05);
-        }
-
-        .matchup-item.selected {
-            border-color: #667eea;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            transition: border-color 0.3s ease;
         }
 
         .matchup-vs {
@@ -764,31 +754,27 @@
                 
                 container.innerHTML = `
                     <div class="matchup-items-row">
-                        <div class="matchup-item" onclick="selectMatchup('item1')" id="item1-select">
-                            <div class="matchup-item-content">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                    <div style="font-size: 1.2em; font-weight: bold;">${escapeHtml(data.item1.name)}</div>
-                                    <div style="display: flex; gap: 5px;">
-                                        <a href="${escapeHtml(searchUrl1)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
-                                        <button onclick="autoFillYouTube(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
-                                        <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
-                                    </div>
+                        <div class="matchup-item" id="item1-container">
+                            <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
+                                <div style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
+                                    <a href="${escapeHtml(searchUrl1)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
+                                    <button onclick="autoFillYouTube(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
+                                    <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
                                 </div>
-                                ${video1}
+                                <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item1.name)}</div>
+                                ${video1 ? `<div>${video1}</div>` : ''}
                             </div>
                         </div>
                         <div class="matchup-vs">VS</div>
-                        <div class="matchup-item" onclick="selectMatchup('item2')" id="item2-select">
-                            <div class="matchup-item-content">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                    <div style="font-size: 1.2em; font-weight: bold;">${escapeHtml(data.item2.name)}</div>
-                                    <div style="display: flex; gap: 5px;">
-                                        <a href="${escapeHtml(searchUrl2)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
-                                        <button onclick="autoFillYouTube(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
-                                        <button onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
-                                    </div>
+                        <div class="matchup-item" id="item2-container">
+                            <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
+                                <div style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
+                                    <a href="${escapeHtml(searchUrl2)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
+                                    <button onclick="autoFillYouTube(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
+                                    <button onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
                                 </div>
-                                ${video2}
+                                <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item2.name)}</div>
+                                ${video2 ? `<div>${video2}</div>` : ''}
                             </div>
                         </div>
                     </div>
@@ -823,16 +809,6 @@
             }
         }
 
-        function selectMatchup(choice) {
-            document.getElementById('item1-select').classList.remove('selected');
-            document.getElementById('item2-select').classList.remove('selected');
-            
-            if (choice === 'item1') {
-                document.getElementById('item1-select').classList.add('selected');
-            } else {
-                document.getElementById('item2-select').classList.add('selected');
-            }
-        }
 
         async function submitMatchup(winner) {
             if (!window.currentMatchup) return;
