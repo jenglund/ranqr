@@ -753,6 +753,11 @@
                 const searchUrl2 = getYouTubeSearchUrl(searchPrefix, data.item2.name);
                 
                 container.innerHTML = `
+                    <div class="matchup-buttons" style="margin-bottom: 30px;">
+                        <button onclick="submitMatchup('item1')" id="submit-item1">${escapeHtml(data.item1.name)} Wins</button>
+                        <button onclick="submitMatchup('tie')" class="secondary">Tie</button>
+                        <button onclick="submitMatchup('item2')" id="submit-item2">${escapeHtml(data.item2.name)} Wins</button>
+                    </div>
                     <div class="matchup-items-row">
                         <div class="matchup-item" id="item1-container">
                             <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
@@ -777,11 +782,6 @@
                                 ${video2 ? `<div>${video2}</div>` : ''}
                             </div>
                         </div>
-                    </div>
-                    <div class="matchup-buttons">
-                        <button onclick="submitMatchup('item1')" id="submit-item1">${escapeHtml(data.item1.name)} Wins</button>
-                        <button onclick="submitMatchup('tie')" class="secondary">Tie</button>
-                        <button onclick="submitMatchup('item2')" id="submit-item2">${escapeHtml(data.item2.name)} Wins</button>
                     </div>
                     ${window.lastVote ? `
                     <div style="width: 100%; margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; text-align: center;">
