@@ -626,6 +626,203 @@
             pointer-events: none;
             z-index: 9999;
         }
+
+        /* Histogram Styles */
+        .histogram {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 8px;
+            padding: 20px;
+            min-height: 200px;
+            border-bottom: 2px solid #ddd;
+            position: relative;
+        }
+
+        .histogram-bar {
+            flex: 1;
+            min-width: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .histogram-bar:hover {
+            opacity: 0.8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        .histogram-bar-label {
+            position: absolute;
+            bottom: -25px;
+            font-size: 0.85em;
+            color: #666;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .histogram-bar-value {
+            position: absolute;
+            top: -25px;
+            font-size: 0.9em;
+            color: #667eea;
+            font-weight: bold;
+            background: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .histogram-bar:hover .histogram-bar-value {
+            opacity: 1;
+        }
+
+        .histogram-axis {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        /* Sub-score Histogram Popup */
+        .sub-score-popup {
+            position: fixed;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding: 20px;
+            z-index: 2000;
+            min-width: 400px;
+            max-width: 600px;
+        }
+
+        .sub-score-popup h4 {
+            margin: 0 0 15px 0;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+
+        .sub-score-popup .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sub-score-popup .close-btn:hover {
+            color: #dc3545;
+        }
+
+        .sub-histogram {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 6px;
+            padding: 15px;
+            min-height: 150px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .sub-histogram-bar {
+            flex: 1;
+            min-width: 25px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border-radius: 3px 3px 0 0;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .sub-histogram-bar-label {
+            position: absolute;
+            bottom: -20px;
+            font-size: 0.8em;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .sub-histogram-bar-value {
+            position: absolute;
+            top: -20px;
+            font-size: 0.85em;
+            color: #28a745;
+            font-weight: bold;
+            background: white;
+            padding: 2px 5px;
+            border-radius: 3px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Cyberpunk theme adjustments for histogram */
+        body.theme-cyberpunk .histogram-bar {
+            background: #0a0a0a;
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        body.theme-cyberpunk .histogram-bar:hover {
+            border-color: #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+        }
+
+        body.theme-cyberpunk .histogram-bar-label {
+            color: #00ff00;
+        }
+
+        body.theme-cyberpunk .histogram-bar-value {
+            background: #0a0a0a;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+
+        body.theme-cyberpunk .sub-score-popup {
+            background: #0a0a0a;
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        body.theme-cyberpunk .sub-score-popup h4 {
+            color: #00ff00;
+        }
+
+        body.theme-cyberpunk .sub-histogram-bar {
+            background: #0a0a0a;
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        body.theme-cyberpunk .sub-histogram-bar-label {
+            color: #00ffff;
+        }
+
+        body.theme-cyberpunk .sub-histogram-bar-value {
+            background: #0a0a0a;
+            color: #00ffff;
+            border: 1px solid #00ffff;
+        }
     </style>
 </head>
 <body>
@@ -718,6 +915,13 @@
                     </div>
                 </div>
                 
+                <div id="histogram-section" style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <h4 style="margin-bottom: 15px; color: #667eea;">Score Distribution</h4>
+                    <div id="histogram-container" style="min-height: 200px; position: relative;">
+                        <div class="loading">Loading histogram...</div>
+                    </div>
+                </div>
+
                 <div class="add-items-section">
                     <h4 style="margin-bottom: 10px; color: #667eea;">Add New Items</h4>
                     <div class="form-group">
@@ -1114,6 +1318,9 @@
                         <div class="label">Progress</div>
                     </div>
                 `;
+                
+                // Load and render histogram
+                await loadHistogram();
                 
                 const searchPrefix = collection.search_prefix || '';
                 
@@ -1997,6 +2204,171 @@
                 }
             }
         }
+
+        // Histogram functions
+        async function loadHistogram() {
+            if (!currentCollectionId) return;
+            
+            const container = document.getElementById('histogram-container');
+            container.innerHTML = '<div class="loading">Loading histogram...</div>';
+            
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}/score-distribution`);
+                if (!response.ok) {
+                    container.innerHTML = '<div class="loading">Error loading histogram</div>';
+                    return;
+                }
+                
+                const data = await response.json();
+                renderHistogram(data.distribution);
+            } catch (error) {
+                console.error('Error loading histogram:', error);
+                container.innerHTML = '<div class="loading">Error loading histogram</div>';
+            }
+        }
+
+        function renderHistogram(distribution) {
+            const container = document.getElementById('histogram-container');
+            
+            if (!distribution || distribution.length === 0) {
+                container.innerHTML = '<div class="loading">No data available</div>';
+                return;
+            }
+            
+            // Find max count for scaling
+            const maxCount = Math.max(...distribution.map(d => d.count));
+            const maxHeight = 200; // pixels
+            
+            // Build histogram HTML
+            let histogramHTML = '<div class="histogram">';
+            
+            distribution.forEach(item => {
+                const height = maxCount > 0 ? (item.count / maxCount) * maxHeight : 0;
+                const scoreLabel = item.score > 0 ? `+${item.score}` : `${item.score}`;
+                
+                histogramHTML += `
+                    <div class="histogram-bar" 
+                         data-score="${item.score}"
+                         data-sub-scores='${JSON.stringify(item.sub_score_distribution)}'
+                         style="height: ${height}px;"
+                         title="Score ${scoreLabel}: ${item.count} item(s)">
+                        <span class="histogram-bar-value">${item.count}</span>
+                        <span class="histogram-bar-label">${scoreLabel}</span>
+                    </div>
+                `;
+            });
+            
+            histogramHTML += '</div>';
+            container.innerHTML = histogramHTML;
+            
+            // Add click handlers
+            container.querySelectorAll('.histogram-bar').forEach(bar => {
+                bar.addEventListener('click', function() {
+                    const score = parseInt(this.getAttribute('data-score'));
+                    const subScoresJson = this.getAttribute('data-sub-scores');
+                    const subScoreDistribution = JSON.parse(subScoresJson);
+                    showSubScoreHistogram(score, subScoreDistribution);
+                });
+            });
+        }
+
+        function showSubScoreHistogram(score, subScoreDistribution) {
+            // Remove existing popup if any
+            const existingPopup = document.getElementById('sub-score-popup');
+            if (existingPopup) {
+                existingPopup.remove();
+            }
+            
+            // Create popup element
+            const popup = document.createElement('div');
+            popup.id = 'sub-score-popup';
+            popup.className = 'sub-score-popup';
+            
+            // Build sub-histogram HTML
+            let subHistogramHTML = '<div class="sub-histogram">';
+            
+            if (!subScoreDistribution || subScoreDistribution.length === 0) {
+                subHistogramHTML += '<div style="padding: 20px; text-align: center; color: #666;">No sub-score data available (all items have the same sub-score or no comparisons within this group)</div>';
+            } else {
+                // Find max count for scaling
+                const maxCount = Math.max(...subScoreDistribution.map(d => d.count));
+                const maxHeight = 120; // pixels
+                
+                subScoreDistribution.forEach(item => {
+                    const height = maxCount > 0 ? (item.count / maxCount) * maxHeight : 0;
+                    const subScoreLabel = item.sub_score > 0 ? `+${item.sub_score}` : `${item.sub_score}`;
+                    
+                    subHistogramHTML += `
+                        <div class="sub-histogram-bar" style="height: ${height}px;" title="Sub-score ${subScoreLabel}: ${item.count} item(s)">
+                            <span class="sub-histogram-bar-value">${item.count}</span>
+                            <span class="sub-histogram-bar-label">${subScoreLabel}</span>
+                        </div>
+                    `;
+                });
+            }
+            
+            subHistogramHTML += '</div>';
+            
+            const scoreLabel = score > 0 ? `+${score}` : `${score}`;
+            popup.innerHTML = `
+                <button class="close-btn" onclick="closeSubScoreHistogram()">×</button>
+                <h4>Sub-Score Distribution for Score ${scoreLabel}</h4>
+                ${subHistogramHTML}
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666;">
+                    <p>This shows how items with score ${scoreLabel} are distributed by their sub-scores (comparisons within the tied group).</p>
+                </div>
+            `;
+            
+            // Position popup near the clicked bar (or center if we can't determine position)
+            document.body.appendChild(popup);
+            
+            // Center the popup initially
+            const rect = popup.getBoundingClientRect();
+            popup.style.left = `${(window.innerWidth - rect.width) / 2}px`;
+            popup.style.top = `${(window.innerHeight - rect.height) / 2}px`;
+            
+            // Try to position near mouse/click position if available
+            if (window.lastHistogramClick) {
+                const x = window.lastHistogramClick.x;
+                const y = window.lastHistogramClick.y;
+                popup.style.left = `${Math.max(10, Math.min(x - rect.width / 2, window.innerWidth - rect.width - 10))}px`;
+                popup.style.top = `${Math.max(10, Math.min(y - rect.height / 2, window.innerHeight - rect.height - 10))}px`;
+            }
+            
+            // Close on outside click
+            setTimeout(() => {
+                document.addEventListener('click', closeSubScoreHistogramOnOutsideClick, true);
+            }, 0);
+        }
+
+        function closeSubScoreHistogram() {
+            const popup = document.getElementById('sub-score-popup');
+            if (popup) {
+                popup.remove();
+            }
+            document.removeEventListener('click', closeSubScoreHistogramOnOutsideClick, true);
+        }
+
+        function closeSubScoreHistogramOnOutsideClick(event) {
+            const popup = document.getElementById('sub-score-popup');
+            if (popup && !popup.contains(event.target)) {
+                // Check if click was on a histogram bar
+                const histogramBar = event.target.closest('.histogram-bar');
+                if (!histogramBar) {
+                    closeSubScoreHistogram();
+                }
+            }
+        }
+
+        // Track histogram bar clicks for positioning
+        document.addEventListener('click', (event) => {
+            if (event.target.closest('.histogram-bar')) {
+                window.lastHistogramClick = {
+                    x: event.clientX,
+                    y: event.clientY
+                };
+            }
+        });
     </script>
 </body>
 </html>
