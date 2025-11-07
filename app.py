@@ -213,6 +213,48 @@ def get_collection(collection_id):
         'comparisons_count': len(collection.comparisons)
     })
 
+@app.route('/api/collections/<int:collection_id>/score-distribution', methods=['GET'])
+def get_score_distribution(collection_id):
+    """Get score distribution data for histogram visualization."""
+    collection = Collection.query.get_or_404(collection_id)
+    items = list(collection.items)
+    comparisons = list(collection.comparisons)
+    
+    # Group items by main score
+    items_by_score = {}
+    for item in items:
+        score = item.points
+        if score not in items_by_score:
+            items_by_score[score] = []
+        items_by_score[score].append(item)
+    
+    # Build distribution data with sub-scores
+    distribution = []
+    for score in sorted(items_by_score.keys(), reverse=True):
+        items_in_group = items_by_score[score]
+        
+        # Calculate sub-scores for this group
+        sub_scores = calculate_sub_scores(items_in_group, comparisons)
+        
+        # Count sub-score distribution
+        sub_score_counts = {}
+        for item in items_in_group:
+            sub_score = sub_scores[item.id]
+            sub_score_counts[sub_score] = sub_score_counts.get(sub_score, 0) + 1
+        
+        distribution.append({
+            'score': score,
+            'count': len(items_in_group),
+            'sub_score_distribution': [
+                {'sub_score': sub_score, 'count': count}
+                for sub_score, count in sorted(sub_score_counts.items(), reverse=True)
+            ]
+        })
+    
+    return jsonify({
+        'distribution': distribution
+    })
+
 @app.route('/api/collections/<int:collection_id>/matchup', methods=['GET'])
 def get_next_matchup(collection_id):
     collection = Collection.query.get_or_404(collection_id)
