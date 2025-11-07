@@ -630,6 +630,7 @@
                 <div class="view-controls">
                     <button onclick="showMatchup()">Make Comparisons</button>
                     <button onclick="showRankings()">View Rankings</button>
+                    <button onclick="showFixedTriangles()">Fixed Triangles</button>
                 </div>
 
                 <div id="stats" class="stats hidden"></div>
@@ -683,6 +684,13 @@
                 </div>
 
                 <ul id="rankings-list" class="rankings-list"></ul>
+            </div>
+
+            <div id="fixed-triangles-section" class="card hidden">
+                <h3 class="section-title">Fixed Triangles</h3>
+                <div id="triangles-container">
+                    <div class="loading">Loading triangles...</div>
+                </div>
             </div>
         </div>
         
@@ -873,13 +881,213 @@
         async function showMatchup() {
             document.getElementById('matchup-section').classList.remove('hidden');
             document.getElementById('rankings-section').classList.add('hidden');
+            document.getElementById('fixed-triangles-section').classList.add('hidden');
             await loadNextMatchup();
         }
 
         async function showRankings() {
             document.getElementById('matchup-section').classList.add('hidden');
             document.getElementById('rankings-section').classList.remove('hidden');
+            document.getElementById('fixed-triangles-section').classList.add('hidden');
             await loadRankings();
+        }
+
+        async function showFixedTriangles() {
+            document.getElementById('matchup-section').classList.add('hidden');
+            document.getElementById('rankings-section').classList.add('hidden');
+            document.getElementById('fixed-triangles-section').classList.remove('hidden');
+            await loadTriangles();
+        }
+
+        async function loadTriangles() {
+            const container = document.getElementById('triangles-container');
+            container.innerHTML = '<div class="loading">Loading triangles...</div>';
+            
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}/triangles`);
+                if (!response.ok) {
+                    container.innerHTML = '<div class="loading">Error loading triangles</div>';
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (!data.triangles || data.triangles.length === 0) {
+                    container.innerHTML = '<div class="loading" style="padding: 40px; text-align: center; color: #666;">No triangles (cycles) found in this collection. All comparisons are consistent!</div>';
+                    return;
+                }
+                
+                let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
+                
+                for (const triangle of data.triangles) {
+                    html += `
+                        <div style="border: 2px solid #667eea; border-radius: 8px; padding: 20px; background: #f8f9fa;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0; color: #667eea;">Triangle (Dissonance: ${triangle.dissonance.toFixed(2)})</h4>
+                                <button onclick="showTriangleOptions(${triangle.item_a.id}, ${triangle.item_b.id}, ${triangle.item_c.id})" 
+                                        style="padding: 8px 16px; font-size: 0.9em;">Resolve</button>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div><strong>${escapeHtml(triangle.item_a.name)}</strong> (${triangle.item_a.points > 0 ? '+' : ''}${triangle.item_a.points} pts)</div>
+                                <div><strong>${escapeHtml(triangle.item_b.name)}</strong> (${triangle.item_b.points > 0 ? '+' : ''}${triangle.item_b.points} pts)</div>
+                                <div><strong>${escapeHtml(triangle.item_c.name)}</strong> (${triangle.item_c.points > 0 ? '+' : ''}${triangle.item_c.points} pts)</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading triangles:', error);
+                container.innerHTML = '<div class="loading">Error loading triangles</div>';
+            }
+        }
+
+        async function showTriangleOptions(item_a_id, item_b_id, item_c_id) {
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}/triangles/${item_a_id}/${item_b_id}/${item_c_id}/options`);
+                if (!response.ok) {
+                    alert('Error loading resolution options');
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                // Get item names
+                const collectionResponse = await fetch(`/api/collections/${currentCollectionId}`);
+                const collection = await collectionResponse.json();
+                const items_dict = {};
+                collection.items.forEach(item => {
+                    items_dict[item.id] = item;
+                });
+                
+                const item_a_name = items_dict[item_a_id]?.name || 'Item A';
+                const item_b_name = items_dict[item_b_id]?.name || 'Item B';
+                const item_c_name = items_dict[item_c_id]?.name || 'Item C';
+                
+                // Create dialog
+                let dialogHTML = `
+                    <div id="triangle-options-dialog" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center; overflow-y: auto;">
+                        <div class="card" style="max-width: 800px; max-height: 90vh; overflow-y: auto; margin: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h3 class="section-title" style="margin: 0;">Resolution Options</h3>
+                                <button onclick="closeTriangleOptionsDialog()" style="background: none; border: none; font-size: 1.5em; cursor: pointer; color: #666;">×</button>
+                            </div>
+                            <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                                <strong>Triangle:</strong> ${escapeHtml(item_a_name)}, ${escapeHtml(item_b_name)}, ${escapeHtml(item_c_name)}
+                            </div>
+                            <div id="triangle-options-list" style="display: flex; flex-direction: column; gap: 15px;">
+                `;
+                
+                for (let i = 0; i < data.options.length; i++) {
+                    const option = data.options[i];
+                    const ordering = option.ordering;
+                    const firstItem = items_dict[ordering[0].item_id];
+                    const secondItem = items_dict[ordering[1].item_id];
+                    const thirdItem = items_dict[ordering[2].item_id];
+                    
+                    const dissonanceChange = option.dissonance_change;
+                    const changeColor = dissonanceChange < 0 ? '#28a745' : dissonanceChange > 0 ? '#dc3545' : '#6c757d';
+                    const changeSymbol = dissonanceChange < 0 ? '↓' : dissonanceChange > 0 ? '↑' : '=';
+                    
+                    dialogHTML += `
+                        <div style="border: 2px solid #ddd; border-radius: 6px; padding: 15px; background: white;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                                <div>
+                                    <strong>Option ${i + 1}:</strong>
+                                    <div style="margin-top: 5px; color: #666;">
+                                        1st: ${escapeHtml(firstItem.name)}<br>
+                                        2nd: ${escapeHtml(secondItem.name)}<br>
+                                        3rd: ${escapeHtml(thirdItem.name)}
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="color: ${changeColor}; font-weight: bold; font-size: 1.1em;">
+                                        ${changeSymbol} ${Math.abs(dissonanceChange).toFixed(2)}
+                                    </div>
+                                    <div style="font-size: 0.85em; color: #666;">
+                                        Dissonance change
+                                    </div>
+                                </div>
+                            </div>
+                            <button onclick="resolveTriangle(${item_a_id}, ${item_b_id}, ${item_c_id}, ${i})" 
+                                    style="width: 100%; padding: 10px; font-size: 0.95em; ${dissonanceChange < 0 ? 'background: #28a745;' : ''}">
+                                Select This Resolution
+                            </button>
+                        </div>
+                    `;
+                }
+                
+                dialogHTML += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Remove existing dialog if any
+                const existing = document.getElementById('triangle-options-dialog');
+                if (existing) {
+                    existing.remove();
+                }
+                
+                document.body.insertAdjacentHTML('beforeend', dialogHTML);
+                
+                // Store options data for resolution
+                window.currentTriangleOptions = {
+                    item_a_id: item_a_id,
+                    item_b_id: item_b_id,
+                    item_c_id: item_c_id,
+                    options: data.options
+                };
+            } catch (error) {
+                console.error('Error loading triangle options:', error);
+                alert('Error loading resolution options');
+            }
+        }
+
+        function closeTriangleOptionsDialog() {
+            const dialog = document.getElementById('triangle-options-dialog');
+            if (dialog) {
+                dialog.remove();
+            }
+            window.currentTriangleOptions = null;
+        }
+
+        async function resolveTriangle(item_a_id, item_b_id, item_c_id, optionIndex) {
+            if (!window.currentTriangleOptions) {
+                alert('Error: Triangle options not loaded');
+                return;
+            }
+            
+            const option = window.currentTriangleOptions.options[optionIndex];
+            const resolution = option.resolution;
+            
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}/triangles/resolve`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        item_a_id: item_a_id,
+                        item_b_id: item_b_id,
+                        item_c_id: item_c_id,
+                        resolution: resolution
+                    })
+                });
+                
+                if (response.ok) {
+                    closeTriangleOptionsDialog();
+                    await loadTriangles(); // Reload triangles list
+                    await loadRankings(); // Update rankings
+                    alert('Triangle resolved successfully!');
+                } else {
+                    const error = await response.json();
+                    alert(`Error resolving triangle: ${error.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error resolving triangle:', error);
+                alert('Error resolving triangle');
+            }
         }
 
         async function loadNextMatchup(specificItem1Id = null, specificItem2Id = null) {
