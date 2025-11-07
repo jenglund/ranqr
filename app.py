@@ -255,6 +255,159 @@ def get_score_distribution(collection_id):
         'distribution': distribution
     })
 
+@app.route('/api/collections/<int:collection_id>/triangles', methods=['GET'])
+def get_triangles(collection_id):
+    """Get all triangles (cycles) in a collection, sorted by dissonance (highest first)."""
+    collection = Collection.query.get_or_404(collection_id)
+    
+    triangles_data = find_triangles(collection)
+    
+    # Build triangle data with dissonance
+    triangles_with_dissonance = []
+    items_dict = {item.id: item for item in collection.items}
+    
+    for triangle in triangles_data:
+        item_a_id, item_b_id, item_c_id, comp_ab, comp_bc, comp_ca = triangle
+        
+        item_a = items_dict[item_a_id]
+        item_b = items_dict[item_b_id]
+        item_c = items_dict[item_c_id]
+        
+        dissonance = calculate_triangle_dissonance(item_a, item_b, item_c, list(collection.comparisons))
+        
+        triangles_with_dissonance.append({
+            'item_a': {
+                'id': item_a.id,
+                'name': item_a.name,
+                'points': item_a.points
+            },
+            'item_b': {
+                'id': item_b.id,
+                'name': item_b.name,
+                'points': item_b.points
+            },
+            'item_c': {
+                'id': item_c.id,
+                'name': item_c.name,
+                'points': item_c.points
+            },
+            'dissonance': dissonance
+        })
+    
+    # Sort by dissonance (highest first)
+    triangles_with_dissonance.sort(key=lambda x: x['dissonance'], reverse=True)
+    
+    return jsonify({
+        'triangles': triangles_with_dissonance
+    })
+
+@app.route('/api/collections/<int:collection_id>/triangles/<int:item_a_id>/<int:item_b_id>/<int:item_c_id>/options', methods=['GET'])
+def get_triangle_options(collection_id, item_a_id, item_b_id, item_c_id):
+    """Get resolution options for a specific triangle."""
+    collection = Collection.query.get_or_404(collection_id)
+    
+    # Verify items belong to collection
+    items_dict = {item.id: item for item in collection.items}
+    if item_a_id not in items_dict or item_b_id not in items_dict or item_c_id not in items_dict:
+        return jsonify({'error': 'One or more items not found in collection'}), 404
+    
+    options = get_triangle_resolution_options(collection, item_a_id, item_b_id, item_c_id)
+    
+    # Format options for JSON response
+    formatted_options = []
+    for opt in options:
+        item_a = items_dict[item_a_id]
+        item_b = items_dict[item_b_id]
+        item_c = items_dict[item_c_id]
+        
+        # Build ordering description
+        ordering = []
+        for item_id, order in [(item_a_id, opt['resolution']['item_a_order']),
+                               (item_b_id, opt['resolution']['item_b_order']),
+                               (item_c_id, opt['resolution']['item_c_order'])]:
+            ordering.append({'item_id': item_id, 'order': order})
+        ordering.sort(key=lambda x: x['order'])
+        
+        formatted_options.append({
+            'resolution': opt['resolution'],
+            'ordering': ordering,  # List of items in order (1st, 2nd, 3rd)
+            'changes': opt['changes'],
+            'dissonance_change': opt['dissonance_change'],
+            'new_dissonance': opt['new_dissonance']
+        })
+    
+    return jsonify({
+        'options': formatted_options
+    })
+
+@app.route('/api/collections/<int:collection_id>/triangles/resolve', methods=['POST'])
+def resolve_triangle(collection_id):
+    """Apply a triangle resolution by updating comparisons."""
+    collection = Collection.query.get_or_404(collection_id)
+    data = request.json
+    
+    item_a_id = data.get('item_a_id')
+    item_b_id = data.get('item_b_id')
+    item_c_id = data.get('item_c_id')
+    resolution = data.get('resolution')  # Dict with item_a_order, item_b_order, item_c_order
+    
+    if not all([item_a_id, item_b_id, item_c_id, resolution]):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    # Verify items belong to collection
+    items_dict = {item.id: item for item in collection.items}
+    if item_a_id not in items_dict or item_b_id not in items_dict or item_c_id not in items_dict:
+        return jsonify({'error': 'One or more items not found in collection'}), 404
+    
+    # Get resolution options to find the changes needed
+    options = get_triangle_resolution_options(collection, item_a_id, item_b_id, item_c_id)
+    
+    # Find matching option
+    matching_option = None
+    for opt in options:
+        if (opt['resolution']['item_a_order'] == resolution.get('item_a_order') and
+            opt['resolution']['item_b_order'] == resolution.get('item_b_order') and
+            opt['resolution']['item_c_order'] == resolution.get('item_c_order')):
+            matching_option = opt
+            break
+    
+    if not matching_option:
+        return jsonify({'error': 'Invalid resolution option'}), 400
+    
+    # Apply changes
+    for change in matching_option['changes']:
+        comparison = Comparison.query.get(change['comparison_id'])
+        if not comparison:
+            return jsonify({'error': 'Comparison not found'}), 404
+        
+        # Update comparison result
+        old_result = comparison.result
+        comparison.result = change['new_result']
+        
+        # Update points for the items involved
+        item1 = db.session.get(Item, change['item1_id'])
+        item2 = db.session.get(Item, change['item2_id'])
+        
+        # Reverse old point adjustments
+        if old_result == 'item1':
+            item1.points -= 1
+            item2.points += 1
+        elif old_result == 'item2':
+            item1.points += 1
+            item2.points -= 1
+        
+        # Apply new point adjustments
+        if change['new_result'] == 'item1':
+            item1.points += 1
+            item2.points -= 1
+        elif change['new_result'] == 'item2':
+            item1.points -= 1
+            item2.points += 1
+    
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
 @app.route('/api/collections/<int:collection_id>/matchup', methods=['GET'])
 def get_next_matchup(collection_id):
     collection = Collection.query.get_or_404(collection_id)
@@ -849,6 +1002,331 @@ def import_collection():
         'items_imported': len(data['items']),
         'comparisons_imported': comparisons_imported
     }), 201
+
+def find_triangles(collection):
+    """
+    Find all triangles (cycles of 3 items) in a collection.
+    A triangle is a cycle where A > B, B > C, C > A (or any permutation).
+    
+    Returns:
+        List of tuples: (item_a_id, item_b_id, item_c_id, comparison_ab, comparison_bc, comparison_ca)
+        where comparisons are the result strings ('item1', 'item2', or 'tie')
+    """
+    items = list(collection.items)
+    comparisons = {}
+    
+    # Build comparison lookup: (item1_id, item2_id) -> result
+    for comp in collection.comparisons:
+        if comp.result:  # Only consider non-null results
+            comparisons[(comp.item1_id, comp.item2_id)] = comp.result
+    
+    triangles = []
+    item_ids = [item.id for item in items]
+    
+    # Check all combinations of 3 items
+    for i in range(len(item_ids)):
+        for j in range(i + 1, len(item_ids)):
+            for k in range(j + 1, len(item_ids)):
+                a_id, b_id, c_id = item_ids[i], item_ids[j], item_ids[k]
+                
+                # Get comparisons (normalized: smaller ID first)
+                ab_key = (min(a_id, b_id), max(a_id, b_id))
+                bc_key = (min(b_id, c_id), max(b_id, c_id))
+                ca_key = (min(c_id, a_id), max(c_id, a_id))
+                
+                comp_ab = comparisons.get(ab_key)
+                comp_bc = comparisons.get(bc_key)
+                comp_ca = comparisons.get(ca_key)
+                
+                # Need all three comparisons to form a triangle
+                if not (comp_ab and comp_bc and comp_ca):
+                    continue
+                
+                # Normalize comparison results to determine direction
+                # For (a_id, b_id): if a_id < b_id, 'item1' means a wins, 'item2' means b wins
+                # We need to check if there's a cycle
+                
+                def get_winner(comp_key, result):
+                    """Determine which item won given the comparison key and result."""
+                    item1_id, item2_id = comp_key
+                    if result == 'item1':
+                        return item1_id
+                    elif result == 'item2':
+                        return item2_id
+                    else:  # tie
+                        return None
+                
+                winner_ab = get_winner(ab_key, comp_ab)
+                winner_bc = get_winner(bc_key, comp_bc)
+                winner_ca = get_winner(ca_key, comp_ca)
+                
+                # Check for cycle: A beats B, B beats C, C beats A (or any rotation)
+                # We need exactly one winner per comparison (no ties)
+                if not (winner_ab and winner_bc and winner_ca):
+                    continue  # Skip if any comparison is a tie
+                
+                # Check if it's a cycle
+                # There are 6 possible cycles:
+                # 1. A > B, B > C, C > A
+                # 2. A > B, C > B, A > C
+                # 3. B > A, B > C, C > A
+                # 4. B > A, C > B, A > C
+                # 5. A > B, B > C, A > C (not a cycle)
+                # 6. B > A, C > B, C > A (not a cycle)
+                
+                # Check for cycle: all three items must be winners and losers
+                winners = {winner_ab, winner_bc, winner_ca}
+                losers = set()
+                
+                # Determine losers based on comparison keys
+                item1_ab, item2_ab = ab_key
+                if winner_ab == item1_ab:
+                    losers.add(item2_ab)
+                else:
+                    losers.add(item1_ab)
+                
+                item1_bc, item2_bc = bc_key
+                if winner_bc == item1_bc:
+                    losers.add(item2_bc)
+                else:
+                    losers.add(item1_bc)
+                
+                item1_ca, item2_ca = ca_key
+                if winner_ca == item1_ca:
+                    losers.add(item2_ca)
+                else:
+                    losers.add(item1_ca)
+                
+                # For a cycle, all three items must be both winners and losers
+                # This means each item wins exactly once and loses exactly once
+                if winners == {a_id, b_id, c_id} and losers == {a_id, b_id, c_id}:
+                    triangles.append((a_id, b_id, c_id, comp_ab, comp_bc, comp_ca))
+    
+    return triangles
+
+def calculate_triangle_dissonance(item_a, item_b, item_c, comparisons):
+    """
+    Calculate dissonance for a triangle.
+    
+    Dissonance = sum of the two largest absolute score differences,
+    after discarding the smallest difference.
+    
+    Args:
+        item_a, item_b, item_c: Item objects with points
+        comparisons: List of Comparison objects for the collection
+    
+    Returns:
+        float: Dissonance value
+    """
+    # Get scores (points)
+    score_a = item_a.points
+    score_b = item_b.points
+    score_c = item_c.points
+    
+    # Calculate differences
+    diff_ab = abs(score_a - score_b)
+    diff_bc = abs(score_b - score_c)
+    diff_ca = abs(score_c - score_a)
+    
+    # Find the three differences
+    diffs = [diff_ab, diff_bc, diff_ca]
+    
+    # Remove the smallest and sum the other two
+    diffs.sort()
+    dissonance = diffs[1] + diffs[2]  # Sum of two largest
+    
+    return dissonance
+
+def get_triangle_resolution_options(collection, item_a_id, item_b_id, item_c_id):
+    """
+    Get all 6 resolution options for a triangle and calculate dissonance change for each.
+    
+    Returns:
+        List of dicts with keys:
+        - resolution: dict with item_a_order, item_b_order, item_c_order (1, 2, 3)
+        - changes: list of comparison changes needed
+        - dissonance_change: net change in dissonance if this resolution is applied
+    """
+    from itertools import permutations
+    
+    items_dict = {item.id: item for item in collection.items}
+    item_a = items_dict[item_a_id]
+    item_b = items_dict[item_b_id]
+    item_c = items_dict[item_c_id]
+    
+    # Get current comparisons
+    comparisons_dict = {}
+    for comp in collection.comparisons:
+        key = (min(comp.item1_id, comp.item2_id), max(comp.item1_id, comp.item2_id))
+        comparisons_dict[key] = comp
+    
+    ab_key = (min(item_a_id, item_b_id), max(item_a_id, item_b_id))
+    bc_key = (min(item_b_id, item_c_id), max(item_b_id, item_c_id))
+    ca_key = (min(item_c_id, item_a_id), max(item_c_id, item_a_id))
+    
+    comp_ab = comparisons_dict.get(ab_key)
+    comp_bc = comparisons_dict.get(bc_key)
+    comp_ca = comparisons_dict.get(ca_key)
+    
+    # Calculate current dissonance
+    current_dissonance = calculate_triangle_dissonance(item_a, item_b, item_c, list(collection.comparisons))
+    
+    # Generate all 6 permutations (3! = 6)
+    options = []
+    for perm in permutations([item_a_id, item_b_id, item_c_id]):
+        # Get order positions (1-based: 1st, 2nd, 3rd)
+        order_a = perm.index(item_a_id) + 1
+        order_b = perm.index(item_b_id) + 1
+        order_c = perm.index(item_c_id) + 1
+        
+        # Determine what comparisons need to change
+        # Order 1 is best, order 3 is worst
+        changes = []
+        
+        # Determine new comparison results based on ordering
+        # If order_a < order_b, then a should beat b
+        def get_comparison_result(item1_id, item2_id, order1, order2):
+            """Determine comparison result based on ordering."""
+            if order1 < order2:
+                # item1 should win (lower order = better)
+                if item1_id < item2_id:
+                    return 'item1'
+                else:
+                    return 'item2'
+            elif order1 > order2:
+                # item2 should win (lower order = better)
+                if item1_id < item2_id:
+                    return 'item2'
+                else:
+                    return 'item1'
+            else:
+                return 'tie'
+        
+        # Check AB comparison
+        new_ab_result = get_comparison_result(item_a_id, item_b_id, order_a, order_b)
+        if comp_ab and comp_ab.result != new_ab_result:
+            changes.append({
+                'comparison_id': comp_ab.id,
+                'item1_id': comp_ab.item1_id,
+                'item2_id': comp_ab.item2_id,
+                'old_result': comp_ab.result,
+                'new_result': new_ab_result
+            })
+        
+        # Check BC comparison
+        new_bc_result = get_comparison_result(item_b_id, item_c_id, order_b, order_c)
+        if comp_bc and comp_bc.result != new_bc_result:
+            changes.append({
+                'comparison_id': comp_bc.id,
+                'item1_id': comp_bc.item1_id,
+                'item2_id': comp_bc.item2_id,
+                'old_result': comp_bc.result,
+                'new_result': new_bc_result
+            })
+        
+        # Check CA comparison
+        new_ca_result = get_comparison_result(item_c_id, item_a_id, order_c, order_a)
+        if comp_ca and comp_ca.result != new_ca_result:
+            changes.append({
+                'comparison_id': comp_ca.id,
+                'item1_id': comp_ca.item1_id,
+                'item2_id': comp_ca.item2_id,
+                'old_result': comp_ca.result,
+                'new_result': new_ca_result
+            })
+        
+        # Calculate new dissonance after applying changes
+        # We need to simulate the new scores
+        # Create temporary items with updated scores
+        temp_a = Item(id=item_a.id, collection_id=item_a.collection_id, name=item_a.name, 
+                     points=item_a.points, media_link=item_a.media_link)
+        temp_b = Item(id=item_b.id, collection_id=item_b.collection_id, name=item_b.name,
+                     points=item_b.points, media_link=item_b.media_link)
+        temp_c = Item(id=item_c.id, collection_id=item_c.collection_id, name=item_c.name,
+                     points=item_c.points, media_link=item_c.media_link)
+        
+        # Apply changes to scores
+        for change in changes:
+            # Reverse old result
+            if change['old_result'] == 'item1':
+                if change['item1_id'] == item_a_id:
+                    temp_a.points -= 1
+                elif change['item1_id'] == item_b_id:
+                    temp_b.points -= 1
+                elif change['item1_id'] == item_c_id:
+                    temp_c.points -= 1
+                
+                if change['item2_id'] == item_a_id:
+                    temp_a.points += 1
+                elif change['item2_id'] == item_b_id:
+                    temp_b.points += 1
+                elif change['item2_id'] == item_c_id:
+                    temp_c.points += 1
+            elif change['old_result'] == 'item2':
+                if change['item1_id'] == item_a_id:
+                    temp_a.points += 1
+                elif change['item1_id'] == item_b_id:
+                    temp_b.points += 1
+                elif change['item1_id'] == item_c_id:
+                    temp_c.points += 1
+                
+                if change['item2_id'] == item_a_id:
+                    temp_a.points -= 1
+                elif change['item2_id'] == item_b_id:
+                    temp_b.points -= 1
+                elif change['item2_id'] == item_c_id:
+                    temp_c.points -= 1
+            
+            # Apply new result
+            if change['new_result'] == 'item1':
+                if change['item1_id'] == item_a_id:
+                    temp_a.points += 1
+                elif change['item1_id'] == item_b_id:
+                    temp_b.points += 1
+                elif change['item1_id'] == item_c_id:
+                    temp_c.points += 1
+                
+                if change['item2_id'] == item_a_id:
+                    temp_a.points -= 1
+                elif change['item2_id'] == item_b_id:
+                    temp_b.points -= 1
+                elif change['item2_id'] == item_c_id:
+                    temp_c.points -= 1
+            elif change['new_result'] == 'item2':
+                if change['item1_id'] == item_a_id:
+                    temp_a.points -= 1
+                elif change['item1_id'] == item_b_id:
+                    temp_b.points -= 1
+                elif change['item1_id'] == item_c_id:
+                    temp_c.points -= 1
+                
+                if change['item2_id'] == item_a_id:
+                    temp_a.points += 1
+                elif change['item2_id'] == item_b_id:
+                    temp_b.points += 1
+                elif change['item2_id'] == item_c_id:
+                    temp_c.points += 1
+        
+        # Calculate new dissonance
+        new_dissonance = calculate_triangle_dissonance(temp_a, temp_b, temp_c, [])
+        dissonance_change = new_dissonance - current_dissonance
+        
+        # Also calculate total dissonance change across all triangles
+        # This is complex, so for now we'll just use the triangle's own dissonance change
+        # TODO: Could calculate impact on other triangles
+        
+        options.append({
+            'resolution': {
+                'item_a_order': order_a,
+                'item_b_order': order_b,
+                'item_c_order': order_c
+            },
+            'changes': changes,
+            'dissonance_change': dissonance_change,
+            'new_dissonance': new_dissonance
+        })
+    
+    return options
 
 # Smart matchup algorithm - prioritizes largest tied groups
 def get_smart_matchup(collection):
