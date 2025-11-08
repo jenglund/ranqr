@@ -359,6 +359,142 @@ def get_score_distribution(collection_id):
         'distribution': distribution
     })
 
+@app.route('/api/collections/<int:collection_id>/score-distribution/recursive', methods=['GET'])
+def get_recursive_score_distribution(collection_id):
+    """
+    Get recursive sub-score distribution for a specific score path.
+    
+    Query parameters:
+    - score_path: JSON array of scores representing the path, e.g., [5, 2, 1]
+                  where 5 is main score, 2 is sub-score, 1 is sub-sub-score, etc.
+    """
+    collection = Collection.query.get_or_404(collection_id)
+    items = list(collection.items)
+    comparisons = list(collection.comparisons)
+    
+    # Get score_path from query parameter
+    score_path_json = request.args.get('score_path', '[]')
+    try:
+        import json
+        score_path = json.loads(score_path_json)
+        if not isinstance(score_path, list):
+            return jsonify({'error': 'score_path must be a JSON array'}), 400
+    except (json.JSONDecodeError, ValueError) as e:
+        return jsonify({'error': f'Invalid score_path format: {str(e)}'}), 400
+    
+    if len(score_path) == 0:
+        # Return top-level distribution (same as regular endpoint)
+        items_by_score = {}
+        for item in items:
+            score = item.points
+            if score not in items_by_score:
+                items_by_score[score] = []
+            items_by_score[score].append(item)
+        
+        distribution = []
+        for score in sorted(items_by_score.keys(), reverse=True):
+            items_in_group = items_by_score[score]
+            sub_scores = calculate_sub_scores(items_in_group, comparisons)
+            sub_score_counts = {}
+            for item in items_in_group:
+                sub_score = sub_scores[item.id]
+                sub_score_counts[sub_score] = sub_score_counts.get(sub_score, 0) + 1
+            
+            distribution.append({
+                'score': score,
+                'count': len(items_in_group),
+                'sub_score_distribution': [
+                    {'sub_score': sub_score, 'count': count}
+                    for sub_score, count in sorted(sub_score_counts.items(), reverse=True)
+                ]
+            })
+        
+        return jsonify({
+            'distribution': distribution,
+            'score_path': []
+        })
+    
+    # Filter items based on score path
+    # Start with all items
+    current_items = items
+    
+    # For each level in the path, filter to items with that score
+    for level, target_score in enumerate(score_path):
+        if level == 0:
+            # First level: filter by main points
+            current_items = [item for item in current_items if item.points == target_score]
+        else:
+            # Subsequent levels: filter by sub-score at that level
+            # Calculate sub-scores for the current group
+            sub_scores = calculate_sub_scores(current_items, comparisons)
+            # Filter to items with target sub-score
+            current_items = [item for item in current_items 
+                           if sub_scores.get(item.id, 0) == target_score]
+        
+        if not current_items:
+            # No items match this path
+            return jsonify({
+                'distribution': [],
+                'score_path': score_path
+            })
+    
+    # Calculate sub-score distribution for current items
+    if len(current_items) <= 1:
+        # No sub-scores possible with 0 or 1 items
+        return jsonify({
+            'distribution': [],
+            'score_path': score_path
+        })
+    
+    sub_scores = calculate_sub_scores(current_items, comparisons)
+    sub_score_counts = {}
+    for item in current_items:
+        sub_score = sub_scores[item.id]
+        sub_score_counts[sub_score] = sub_score_counts.get(sub_score, 0) + 1
+    
+    # Check if all sub-scores are the same (all 0 or all same value)
+    unique_sub_scores = set(sub_score_counts.keys())
+    if len(unique_sub_scores) <= 1:
+        # No further drill-down possible
+        return jsonify({
+            'distribution': [],
+            'score_path': score_path
+        })
+    
+    distribution = [{
+        'score': sub_score,
+        'count': count,
+        'sub_score_distribution': []  # Will be populated if clicked
+    } for sub_score, count in sorted(sub_score_counts.items(), reverse=True)]
+    
+    # Pre-calculate next level sub-score distributions for each sub-score
+    for dist_item in distribution:
+        sub_score = dist_item['score']
+        # Get items with this sub-score
+        items_with_sub_score = [item for item in current_items 
+                               if sub_scores.get(item.id, 0) == sub_score]
+        
+        if len(items_with_sub_score) > 1:
+            # Calculate sub-sub-scores
+            sub_sub_scores = calculate_sub_scores(items_with_sub_score, comparisons)
+            sub_sub_score_counts = {}
+            for item in items_with_sub_score:
+                sub_sub_score = sub_sub_scores[item.id]
+                sub_sub_score_counts[sub_sub_score] = sub_sub_score_counts.get(sub_sub_score, 0) + 1
+            
+            # Only include if there are multiple unique sub-sub-scores
+            unique_sub_sub_scores = set(sub_sub_score_counts.keys())
+            if len(unique_sub_sub_scores) > 1:
+                dist_item['sub_score_distribution'] = [
+                    {'sub_score': sub_sub_score, 'count': count}
+                    for sub_sub_score, count in sorted(sub_sub_score_counts.items(), reverse=True)
+                ]
+    
+    return jsonify({
+        'distribution': distribution,
+        'score_path': score_path
+    })
+
 @app.route('/api/collections/<int:collection_id>/triangles', methods=['GET'])
 def get_triangles(collection_id):
     """Get all triangles (cycles) in a collection, sorted by dissonance (highest first)."""

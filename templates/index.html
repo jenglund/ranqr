@@ -499,12 +499,12 @@
             padding: 2px 6px;
             border-radius: 4px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            opacity: 0;
-            transition: opacity 0.2s;
+            opacity: 1;
         }
 
-        .histogram-bar:hover .histogram-bar-value {
-            opacity: 1;
+        .histogram-bar.clicked {
+            opacity: 0.7;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
         }
 
         .histogram-axis {
@@ -515,86 +515,41 @@
             font-size: 0.9em;
         }
 
-        /* Sub-score Histogram Popup */
-        .sub-score-popup {
-            position: fixed;
-            background: white;
-            border: 2px solid #667eea;
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            padding: 20px;
-            z-index: 2000;
-            min-width: 400px;
-            max-width: 600px;
-        }
-
-        .sub-score-popup h4 {
-            margin: 0 0 15px 0;
-            color: #667eea;
-            font-size: 1.2em;
-        }
-
-        .sub-score-popup .close-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: none;
-            border: none;
-            font-size: 1.5em;
-            cursor: pointer;
-            color: #666;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .sub-score-popup .close-btn:hover {
-            color: #dc3545;
-        }
-
-        .sub-histogram {
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-            gap: 6px;
+        /* Nested Histogram Container */
+        .histogram-row {
+            margin-top: 20px;
             padding: 15px;
-            min-height: 150px;
-            border-bottom: 2px solid #ddd;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
         }
 
-        .sub-histogram-bar {
-            flex: 1;
-            min-width: 25px;
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            border-radius: 3px 3px 0 0;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-end;
-        }
-
-        .sub-histogram-bar-label {
-            position: absolute;
-            bottom: -20px;
-            font-size: 0.8em;
+        .histogram-row-header {
+            margin-bottom: 10px;
+            font-size: 0.9em;
             color: #666;
             font-weight: 600;
         }
 
-        .sub-histogram-bar-value {
-            position: absolute;
-            top: -20px;
-            font-size: 0.85em;
-            color: #28a745;
-            font-weight: bold;
-            background: white;
-            padding: 2px 5px;
-            border-radius: 3px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        .histogram-row .histogram {
+            min-height: 150px;
+            padding: 15px;
+        }
+
+        .histogram-row .histogram-bar {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .histogram-row.level-2 .histogram-bar {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+        }
+
+        .histogram-row.level-3 .histogram-bar {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+
+        .histogram-row.level-4 .histogram-bar {
+            background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
         }
     </style>
 </head>
@@ -2327,24 +2282,24 @@
                 }
                 
                 const data = await response.json();
-                renderHistogram(data.distribution);
+                renderHistogram(data.distribution, container, []);
             } catch (error) {
                 console.error('Error loading histogram:', error);
                 container.innerHTML = '<div class="loading">Error loading histogram</div>';
             }
         }
 
-        function renderHistogram(distribution) {
-            const container = document.getElementById('histogram-container');
-            
+        function renderHistogram(distribution, container, scorePath, level = 0) {
             if (!distribution || distribution.length === 0) {
-                container.innerHTML = '<div class="loading">No data available</div>';
+                if (level === 0 && container) {
+                    container.innerHTML = '<div class="loading">No data available</div>';
+                }
                 return;
             }
             
             // Find max count for scaling
             const maxCount = Math.max(...distribution.map(d => d.count));
-            const maxHeight = 200; // pixels
+            const maxHeight = level === 0 ? 200 : 150; // pixels
             
             // Build histogram HTML
             let histogramHTML = '<div class="histogram">';
@@ -2352,13 +2307,18 @@
             distribution.forEach(item => {
                 const height = maxCount > 0 ? (item.count / maxCount) * maxHeight : 0;
                 const scoreLabel = item.score > 0 ? `+${item.score}` : `${item.score}`;
+                const hasSubScores = item.sub_score_distribution && item.sub_score_distribution.length > 0;
+                const barId = `histogram-bar-${scorePath.join('-')}-${item.score}`;
                 
                 histogramHTML += `
                     <div class="histogram-bar" 
+                         id="${barId}"
                          data-score="${item.score}"
-                         data-sub-scores='${JSON.stringify(item.sub_score_distribution)}'
+                         data-score-path='${JSON.stringify([...scorePath, item.score])}'
+                         data-level="${level}"
+                         data-has-sub-scores="${hasSubScores}"
                          style="height: ${height}px;"
-                         title="Score ${scoreLabel}: ${item.count} item(s)">
+                         title="Score ${scoreLabel}: ${item.count} item(s)${hasSubScores ? ' (click to drill down)' : ''}">
                         <span class="histogram-bar-value">${item.count}</span>
                         <span class="histogram-bar-label">${scoreLabel}</span>
                     </div>
@@ -2366,116 +2326,145 @@
             });
             
             histogramHTML += '</div>';
-            container.innerHTML = histogramHTML;
+            
+            if (level === 0) {
+                if (container) {
+                    container.innerHTML = histogramHTML;
+                }
+            } else {
+                // For nested histograms, create a row container
+                const rowId = `histogram-row-${scorePath.join('-')}`;
+                let existingRow = document.getElementById(rowId);
+                if (!existingRow) {
+                    const row = document.createElement('div');
+                    row.id = rowId;
+                    row.className = `histogram-row level-${level}`;
+                    
+                    // Build path label
+                    const pathLabels = scorePath.map((s, i) => {
+                        const label = s > 0 ? `+${s}` : `${s}`;
+                        return i === 0 ? `Score ${label}` : `Sub-score ${label}`;
+                    });
+                    const headerText = pathLabels.join(' → ');
+                    
+                    row.innerHTML = `
+                        <div class="histogram-row-header">${headerText}</div>
+                        ${histogramHTML}
+                    `;
+                    
+                    // Insert after the parent histogram's container
+                    // Find the parent bar that was clicked to trigger this drill-down
+                    const parentScorePath = scorePath.slice(0, -1);
+                    const clickedScore = scorePath[scorePath.length - 1];
+                    const parentBarId = `histogram-bar-${parentScorePath.join('-')}-${clickedScore}`;
+                    const parentBar = document.getElementById(parentBarId);
+                    
+                    const mainContainer = document.getElementById('histogram-container');
+                    const histogramSection = mainContainer.closest('#histogram-section');
+                    
+                    if (parentBar) {
+                        // Find the row containing the parent bar
+                        const parentRow = parentBar.closest('.histogram-row');
+                        if (parentRow) {
+                            // Insert after the parent row
+                            parentRow.parentNode.insertBefore(row, parentRow.nextSibling);
+                        } else {
+                            // Parent bar is in main container, insert after main container
+                            if (histogramSection) {
+                                histogramSection.insertBefore(row, mainContainer.nextSibling);
+                            } else {
+                                mainContainer.parentNode.insertBefore(row, mainContainer.nextSibling);
+                            }
+                        }
+                    } else {
+                        // Fallback: append to histogram section or main container's parent
+                        if (histogramSection) {
+                            histogramSection.appendChild(row);
+                        } else {
+                            mainContainer.parentNode.appendChild(row);
+                        }
+                    }
+                    existingRow = row;
+                } else {
+                    // Update existing row
+                    existingRow.querySelector('.histogram').outerHTML = histogramHTML;
+                }
+            }
             
             // Add click handlers
-            container.querySelectorAll('.histogram-bar').forEach(bar => {
-                bar.addEventListener('click', function() {
+            let bars;
+            if (level === 0) {
+                bars = container.querySelectorAll('.histogram-bar');
+            } else {
+                const row = document.getElementById(`histogram-row-${scorePath.join('-')}`);
+                bars = row ? row.querySelectorAll('.histogram-bar') : [];
+            }
+            
+            bars.forEach(bar => {
+                // Remove existing click handlers by cloning
+                const newBar = bar.cloneNode(true);
+                bar.parentNode.replaceChild(newBar, bar);
+                
+                newBar.addEventListener('click', async function(e) {
+                    e.stopPropagation(); // Prevent event bubbling
+                    
                     const score = parseInt(this.getAttribute('data-score'));
-                    const subScoresJson = this.getAttribute('data-sub-scores');
-                    const subScoreDistribution = JSON.parse(subScoresJson);
-                    showSubScoreHistogram(score, subScoreDistribution);
+                    const scorePathJson = this.getAttribute('data-score-path');
+                    const hasSubScores = this.getAttribute('data-has-sub-scores') === 'true';
+                    const currentLevel = parseInt(this.getAttribute('data-level')) || 0;
+                    
+                    if (!hasSubScores) {
+                        return; // No drill-down available
+                    }
+                    
+                    // Toggle clicked state
+                    this.classList.toggle('clicked');
+                    
+                    const newScorePath = JSON.parse(scorePathJson);
+                    
+                    // Check if child histogram already exists
+                    const childRowId = `histogram-row-${newScorePath.join('-')}`;
+                    const existingChildRow = document.getElementById(childRowId);
+                    
+                    if (existingChildRow) {
+                        // Toggle visibility
+                        if (existingChildRow.style.display === 'none') {
+                            existingChildRow.style.display = 'block';
+                            this.classList.add('clicked');
+                        } else {
+                            existingChildRow.style.display = 'none';
+                            this.classList.remove('clicked');
+                        }
+                        return;
+                    }
+                    
+                    // Load and render child histogram
+                    await loadChildHistogram(newScorePath, currentLevel + 1);
                 });
             });
         }
 
-        function showSubScoreHistogram(score, subScoreDistribution) {
-            // Remove existing popup if any (properly clean up event listener)
-            const existingPopup = document.getElementById('sub-score-popup');
-            if (existingPopup) {
-                closeSubScoreHistogram();
-            }
+        async function loadChildHistogram(scorePath, level) {
+            if (!currentCollectionId) return;
             
-            // Create popup element
-            const popup = document.createElement('div');
-            popup.id = 'sub-score-popup';
-            popup.className = 'sub-score-popup';
-            
-            // Build sub-histogram HTML
-            let subHistogramHTML = '<div class="sub-histogram">';
-            
-            if (!subScoreDistribution || subScoreDistribution.length === 0) {
-                subHistogramHTML += '<div style="padding: 20px; text-align: center; color: #666;">No sub-score data available (all items have the same sub-score or no comparisons within this group)</div>';
-            } else {
-                // Find max count for scaling
-                const maxCount = Math.max(...subScoreDistribution.map(d => d.count));
-                const maxHeight = 120; // pixels
+            try {
+                const scorePathJson = JSON.stringify(scorePath);
+                const response = await fetch(
+                    `/api/collections/${currentCollectionId}/score-distribution/recursive?score_path=${encodeURIComponent(scorePathJson)}`
+                );
                 
-                subScoreDistribution.forEach(item => {
-                    const height = maxCount > 0 ? (item.count / maxCount) * maxHeight : 0;
-                    const subScoreLabel = item.sub_score > 0 ? `+${item.sub_score}` : `${item.sub_score}`;
-                    
-                    subHistogramHTML += `
-                        <div class="sub-histogram-bar" style="height: ${height}px;" title="Sub-score ${subScoreLabel}: ${item.count} item(s)">
-                            <span class="sub-histogram-bar-value">${item.count}</span>
-                            <span class="sub-histogram-bar-label">${subScoreLabel}</span>
-                        </div>
-                    `;
-                });
-            }
-            
-            subHistogramHTML += '</div>';
-            
-            const scoreLabel = score > 0 ? `+${score}` : `${score}`;
-            popup.innerHTML = `
-                <button class="close-btn" onclick="closeSubScoreHistogram()">×</button>
-                <h4>Sub-Score Distribution for Score ${scoreLabel}</h4>
-                ${subHistogramHTML}
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666;">
-                    <p>This shows how items with score ${scoreLabel} are distributed by their sub-scores (comparisons within the tied group).</p>
-                </div>
-            `;
-            
-            // Position popup near the clicked bar (or center if we can't determine position)
-            document.body.appendChild(popup);
-            
-            // Center the popup initially
-            const rect = popup.getBoundingClientRect();
-            popup.style.left = `${(window.innerWidth - rect.width) / 2}px`;
-            popup.style.top = `${(window.innerHeight - rect.height) / 2}px`;
-            
-            // Try to position near mouse/click position if available
-            if (window.lastHistogramClick) {
-                const x = window.lastHistogramClick.x;
-                const y = window.lastHistogramClick.y;
-                popup.style.left = `${Math.max(10, Math.min(x - rect.width / 2, window.innerWidth - rect.width - 10))}px`;
-                popup.style.top = `${Math.max(10, Math.min(y - rect.height / 2, window.innerHeight - rect.height - 10))}px`;
-            }
-            
-            // Close on outside click
-            setTimeout(() => {
-                document.addEventListener('click', closeSubScoreHistogramOnOutsideClick, true);
-            }, 0);
-        }
-
-        function closeSubScoreHistogram() {
-            const popup = document.getElementById('sub-score-popup');
-            if (popup) {
-                popup.remove();
-            }
-            document.removeEventListener('click', closeSubScoreHistogramOnOutsideClick, true);
-        }
-
-        function closeSubScoreHistogramOnOutsideClick(event) {
-            const popup = document.getElementById('sub-score-popup');
-            if (popup && !popup.contains(event.target)) {
-                // Check if click was on a histogram bar
-                const histogramBar = event.target.closest('.histogram-bar');
-                if (!histogramBar) {
-                    closeSubScoreHistogram();
+                if (!response.ok) {
+                    console.error('Error loading child histogram');
+                    return;
                 }
+                
+                const data = await response.json();
+                // For nested histograms, pass null as container since renderHistogram will create its own row
+                renderHistogram(data.distribution, null, scorePath, level);
+            } catch (error) {
+                console.error('Error loading child histogram:', error);
             }
         }
-
-        // Track histogram bar clicks for positioning
-        document.addEventListener('click', (event) => {
-            if (event.target.closest('.histogram-bar')) {
-                window.lastHistogramClick = {
-                    x: event.clientX,
-                    y: event.clientY
-                };
-            }
-        });
     </script>
 </body>
 </html>
