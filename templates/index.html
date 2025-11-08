@@ -2268,6 +2268,92 @@
         }
 
         // Histogram functions
+        
+        /**
+         * Get all bars in the same histogram as the given bar
+         */
+        function getBarsInSameHistogram(barElement) {
+            const bars = [];
+            
+            // Find the container/row that contains this bar
+            const row = barElement.closest('.histogram-row');
+            const container = document.getElementById('histogram-container');
+            
+            if (row) {
+                // Nested histogram - get all bars from this row
+                const allBars = row.querySelectorAll('.histogram-bar');
+                allBars.forEach(b => bars.push(b));
+            } else if (container && container.contains(barElement)) {
+                // Top-level histogram - get all bars from main container
+                const allBars = container.querySelectorAll('.histogram-bar');
+                allBars.forEach(b => bars.push(b));
+            }
+            
+            return bars;
+        }
+        
+        /**
+         * Close a histogram row and all its child histograms recursively
+         */
+        function closeHistogramAndChildren(row) {
+            if (!row) return;
+            
+            // Find all child rows (rows that have this row's path as a prefix)
+            const rowId = row.id;
+            // Extract the score path from the row ID: "histogram-row-5-2-1" -> [5, 2, 1]
+            // Handle negative numbers by using a more robust parsing
+            const pathPart = rowId.replace('histogram-row-', '');
+            // Split by '-' but be careful with negative numbers
+            // We'll use a regex to match numbers (including negative)
+            const rowPath = pathPart.match(/-?\d+/g) ? pathPart.match(/-?\d+/g).map(s => parseInt(s)) : [];
+            
+            // Find all histogram rows
+            const allRows = document.querySelectorAll('.histogram-row');
+            allRows.forEach(childRow => {
+                const childRowId = childRow.id;
+                const childPathPart = childRowId.replace('histogram-row-', '');
+                const childPath = childPathPart.match(/-?\d+/g) ? childPathPart.match(/-?\d+/g).map(s => parseInt(s)) : [];
+                
+                // Check if this child row is a descendant of the row being closed
+                if (childPath.length > rowPath.length) {
+                    // Check if childPath starts with rowPath
+                    let isDescendant = true;
+                    for (let i = 0; i < rowPath.length; i++) {
+                        if (childPath[i] !== rowPath[i]) {
+                            isDescendant = false;
+                            break;
+                        }
+                    }
+                    
+                    if (isDescendant) {
+                        // Close this child row and unselect its parent bar
+                        childRow.style.display = 'none';
+                        
+                        // Find and unselect the parent bar
+                        const parentPath = childPath.slice(0, -1);
+                        const parentScore = childPath[childPath.length - 1];
+                        const parentBarId = `histogram-bar-${parentPath.join('-')}-${parentScore}`;
+                        const parentBar = document.getElementById(parentBarId);
+                        if (parentBar) {
+                            parentBar.classList.remove('clicked');
+                        }
+                    }
+                }
+            });
+            
+            // Close this row
+            row.style.display = 'none';
+            
+            // Unselect the parent bar that triggered this histogram
+            const parentPath = rowPath.slice(0, -1);
+            const parentScore = rowPath[rowPath.length - 1];
+            const parentBarId = `histogram-bar-${parentPath.join('-')}-${parentScore}`;
+            const parentBar = document.getElementById(parentBarId);
+            if (parentBar) {
+                parentBar.classList.remove('clicked');
+            }
+        }
+        
         async function loadHistogram() {
             if (!currentCollectionId) return;
             
@@ -2417,29 +2503,40 @@
                         return; // No drill-down available
                     }
                     
-                    // Toggle clicked state
-                    this.classList.toggle('clicked');
-                    
                     const newScorePath = JSON.parse(scorePathJson);
+                    
+                    // Check if this bar is currently selected BEFORE unselecting others
+                    const isCurrentlySelected = this.classList.contains('clicked');
+                    
+                    // Get all bars in the same histogram (same container/row)
+                    const sameHistogramBars = getBarsInSameHistogram(this);
+                    
+                    // Unselect all bars in the same histogram
+                    sameHistogramBars.forEach(b => {
+                        b.classList.remove('clicked');
+                    });
                     
                     // Check if child histogram already exists
                     const childRowId = `histogram-row-${newScorePath.join('-')}`;
                     const existingChildRow = document.getElementById(childRowId);
                     
-                    if (existingChildRow) {
-                        // Toggle visibility
-                        if (existingChildRow.style.display === 'none') {
-                            existingChildRow.style.display = 'block';
-                            this.classList.add('clicked');
-                        } else {
-                            existingChildRow.style.display = 'none';
-                            this.classList.remove('clicked');
+                    if (isCurrentlySelected) {
+                        // Bar was already selected - close the nested histogram
+                        if (existingChildRow) {
+                            closeHistogramAndChildren(existingChildRow);
                         }
-                        return;
+                    } else {
+                        // Select this bar and show/load child histogram
+                        this.classList.add('clicked');
+                        
+                        if (existingChildRow) {
+                            // Show existing child histogram
+                            existingChildRow.style.display = 'block';
+                        } else {
+                            // Load and render child histogram
+                            await loadChildHistogram(newScorePath, currentLevel + 1);
+                        }
                     }
-                    
-                    // Load and render child histogram
-                    await loadChildHistogram(newScorePath, currentLevel + 1);
                 });
             });
         }
