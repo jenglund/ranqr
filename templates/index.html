@@ -174,6 +174,21 @@
             min-width: 120px;
         }
 
+        .vote-select-btn {
+            transition: all 0.2s;
+        }
+
+        .vote-select-btn.selected {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .vote-select-btn.selected.secondary {
+            background: #6c757d;
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
+        }
+
         .collections-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -630,7 +645,7 @@
                 <div class="view-controls">
                     <button onclick="showMatchup()">Make Comparisons</button>
                     <button onclick="showRankings()">View Rankings</button>
-                    <button onclick="showFixedTriangles()">Fixed Triangles</button>
+                    <button onclick="showFixedTriangles()">Resolve Triangles</button>
                 </div>
 
                 <div id="stats" class="stats hidden"></div>
@@ -1119,11 +1134,6 @@
                 const searchUrl2 = getYouTubeSearchUrl(searchPrefix, data.item2.name);
                 
                 container.innerHTML = `
-                    <div class="matchup-buttons" style="margin-bottom: 30px;">
-                        <button onclick="submitMatchup('item1')" id="submit-item1">${escapeHtml(data.item1.name)} Wins</button>
-                        <button onclick="submitMatchup('tie')" class="secondary">Tie</button>
-                        <button onclick="submitMatchup('item2')" id="submit-item2">${escapeHtml(data.item2.name)} Wins</button>
-                    </div>
                     <div class="matchup-items-row">
                         <div class="matchup-item" id="item1-container">
                             <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
@@ -1149,11 +1159,23 @@
                             </div>
                         </div>
                     </div>
-                    ${window.lastVote ? `
-                    <div style="width: 100%; margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; text-align: center;">
-                        <button onclick="changeLastVote()" style="padding: 8px 16px; font-size: 0.9em; background: #ffc107; color: #000; border: none; border-radius: 4px; cursor: pointer;">↩️ Revise</button>
+                    <div class="matchup-buttons" style="margin-top: 30px;">
+                        <button onclick="selectVote('item1')" id="select-item1" class="vote-select-btn">A Wins</button>
+                        <button onclick="selectVote('tie')" id="select-tie" class="vote-select-btn secondary">Tie</button>
+                        <button onclick="selectVote('item2')" id="select-item2" class="vote-select-btn">B Wins</button>
                     </div>
-                    ` : ''}
+                    <div id="submit-vote-section" class="hidden" style="margin-top: 20px; text-align: center;">
+                        <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #667eea;">
+                            <strong>Selected:</strong> <span id="selected-vote-text"></span>
+                        </div>
+                        <button onclick="submitSelectedVote()" id="submit-vote-btn" style="padding: 12px 32px; font-size: 1.1em;">Submit Vote</button>
+                    </div>
+                    <div style="width: 100%; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;">
+                        <button onclick="revealScores()" style="padding: 10px 20px; font-size: 0.95em; background: #6c757d; color: white;">📊 Reveal Scores</button>
+                        ${window.lastVote ? `
+                        <button onclick="changeLastVote()" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px;">↩️ Revise Last Vote</button>
+                        ` : ''}
+                    </div>
                 `;
                 
                 // Set up edit section for both items
@@ -1168,6 +1190,9 @@
                     item2_media_link: data.item2.media_link
                 };
                 
+                // Clear selected vote when loading new matchup
+                selectedVote = null;
+                
                 // Keep last vote info - don't clear it, just update it when we vote
             } catch (error) {
                 console.error('Error loading matchup:', error);
@@ -1175,6 +1200,52 @@
             }
         }
 
+
+        let selectedVote = null;
+
+        function selectVote(winner) {
+            selectedVote = winner;
+            
+            // Remove selected class from all buttons
+            document.querySelectorAll('.vote-select-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            
+            // Add selected class to clicked button
+            const buttonId = winner === 'item1' ? 'select-item1' : winner === 'item2' ? 'select-item2' : 'select-tie';
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.classList.add('selected');
+            }
+            
+            // Show submit section
+            const submitSection = document.getElementById('submit-vote-section');
+            if (submitSection) {
+                submitSection.classList.remove('hidden');
+            }
+            
+            // Update selected vote text
+            const voteText = document.getElementById('selected-vote-text');
+            if (voteText) {
+                if (winner === 'item1') {
+                    voteText.textContent = 'A Wins';
+                } else if (winner === 'item2') {
+                    voteText.textContent = 'B Wins';
+                } else {
+                    voteText.textContent = 'Tie';
+                }
+            }
+        }
+
+        async function submitSelectedVote() {
+            if (!selectedVote || !window.currentMatchup) {
+                alert('Please select a vote option first');
+                return;
+            }
+            
+            await submitMatchup(selectedVote);
+            selectedVote = null; // Clear selection after submission
+        }
 
         async function submitMatchup(winner) {
             if (!window.currentMatchup) return;
@@ -1212,6 +1283,101 @@
                 console.error('Error submitting matchup:', error);
                 alert('Error submitting matchup');
                 window.lastVote = null; // Clear on error
+            }
+        }
+
+        async function revealScores() {
+            if (!window.currentMatchup) {
+                alert('No matchup loaded');
+                return;
+            }
+            
+            try {
+                // Fetch collection data to get item scores
+                const response = await fetch(`/api/collections/${currentCollectionId}`);
+                const collection = await response.json();
+                
+                // Find items in the collection
+                const item1 = collection.items.find(i => i.id === window.currentMatchup.item1_id);
+                const item2 = collection.items.find(i => i.id === window.currentMatchup.item2_id);
+                
+                if (!item1 || !item2) {
+                    alert('Could not find item scores');
+                    return;
+                }
+                
+                // Format scores
+                let score1Display = `${item1.points > 0 ? '+' : ''}${item1.points}`;
+                let score2Display = `${item2.points > 0 ? '+' : ''}${item2.points}`;
+                
+                if (item1.sub_scores && item1.sub_scores.length > 1) {
+                    const formattedScores = item1.sub_scores.map(score => {
+                        return score > 0 ? `+${score}` : `${score}`;
+                    });
+                    score1Display = formattedScores.join(' / ');
+                }
+                
+                if (item2.sub_scores && item2.sub_scores.length > 1) {
+                    const formattedScores = item2.sub_scores.map(score => {
+                        return score > 0 ? `+${score}` : `${score}`;
+                    });
+                    score2Display = formattedScores.join(' / ');
+                }
+                
+                // Create and show popup
+                showScorePopup(window.currentMatchup.item1_name, score1Display, window.currentMatchup.item2_name, score2Display);
+            } catch (error) {
+                console.error('Error revealing scores:', error);
+                alert('Error revealing scores');
+            }
+        }
+
+        function showScorePopup(item1Name, item1Score, item2Name, item2Score) {
+            // Remove existing popup if any
+            const existingPopup = document.getElementById('score-reveal-popup');
+            if (existingPopup) {
+                existingPopup.remove();
+            }
+            
+            // Create popup
+            const popup = document.createElement('div');
+            popup.id = 'score-reveal-popup';
+            popup.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center;';
+            
+            popup.innerHTML = `
+                <div class="card" style="max-width: 500px; width: 90%; position: relative;">
+                    <button onclick="closeScorePopup()" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 1.5em; cursor: pointer; color: #666; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">×</button>
+                    <h3 class="section-title" style="margin-top: 0;">Current Scores</h3>
+                    <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">
+                        <div style="padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #667eea;">
+                            <div style="font-weight: bold; margin-bottom: 5px; color: #667eea;">${escapeHtml(item1Name)}</div>
+                            <div style="font-size: 1.3em; font-weight: bold; color: #333;">${escapeHtml(item1Score)} pts</div>
+                        </div>
+                        <div style="padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #667eea;">
+                            <div style="font-weight: bold; margin-bottom: 5px; color: #667eea;">${escapeHtml(item2Name)}</div>
+                            <div style="font-size: 1.3em; font-weight: bold; color: #333;">${escapeHtml(item2Score)} pts</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button onclick="closeScorePopup()" style="padding: 10px 30px;">OK</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(popup);
+            
+            // Close on outside click
+            popup.addEventListener('click', (e) => {
+                if (e.target === popup) {
+                    closeScorePopup();
+                }
+            });
+        }
+
+        function closeScorePopup() {
+            const popup = document.getElementById('score-reveal-popup');
+            if (popup) {
+                popup.remove();
             }
         }
 
