@@ -155,6 +155,88 @@ def calculate_sub_scores(items_in_group, comparisons):
     
     return sub_scores
 
+def calculate_recursive_sub_scores(item, items_in_group, comparisons, current_level_score=None, max_depth=10):
+    """
+    Calculate recursive sub-scores for an item, returning a list of scores
+    [main_score, sub_score_1, sub_score_2, ...] where each level represents
+    sub-scores within the previous level's tied group.
+    
+    Args:
+        item: Item object
+        items_in_group: List of Item objects in the current group (all have same score at this level)
+        comparisons: List of all Comparison objects
+        current_level_score: The score at the current level (for recursion)
+        max_depth: Maximum recursion depth to prevent infinite loops
+    
+    Returns:
+        List of scores [main_score, sub_score_1, sub_score_2, ...]
+    """
+    if max_depth <= 0 or len(items_in_group) <= 1:
+        # Base case: no more recursion needed
+        if current_level_score is None:
+            return [item.points]
+        else:
+            return []
+    
+    # Determine the score at this level
+    if current_level_score is None:
+        # Top level: use main score
+        level_score = item.points
+    else:
+        # Recursive level: use the provided score
+        level_score = current_level_score
+    
+    # Calculate sub-scores for items in this group
+    sub_scores = calculate_sub_scores(items_in_group, comparisons)
+    current_sub_score = sub_scores.get(item.id, 0)
+    
+    # Check if there are multiple unique sub-scores (not all 0)
+    unique_sub_scores = set(sub_scores.values())
+    if len(unique_sub_scores) <= 1:
+        # All items have the same sub-score (likely all 0), no need to recurse
+        if current_level_score is None:
+            return [item.points]
+        else:
+            return []
+    
+    # Group items by their sub-score
+    items_by_sub_score = {}
+    for itm in items_in_group:
+        sub_score = sub_scores.get(itm.id, 0)
+        if sub_score not in items_by_sub_score:
+            items_by_sub_score[sub_score] = []
+        items_by_sub_score[sub_score].append(itm)
+    
+    # Get items with the same sub-score as current item
+    items_with_same_sub_score = items_by_sub_score.get(current_sub_score, [])
+    
+    if len(items_with_same_sub_score) > 1:
+        # Recursively calculate sub-scores for the next level
+        # Pass None for current_level_score since we're starting a new level
+        next_level_scores = calculate_recursive_sub_scores(
+            item, items_with_same_sub_score, comparisons, None, max_depth - 1
+        )
+        
+        # Build the score path
+        if current_level_score is None:
+            # Top level: start with main score
+            score_path = [item.points, current_sub_score]
+        else:
+            # Recursive level: start with current sub-score
+            score_path = [current_sub_score]
+        
+        # Append any deeper level scores (skip the first score as it's the main score at that level)
+        if next_level_scores and len(next_level_scores) > 1:
+            score_path.extend(next_level_scores[1:])
+        
+        return score_path
+    else:
+        # Only one item with this sub-score, no need to recurse
+        if current_level_score is None:
+            return [item.points, current_sub_score]
+        else:
+            return [current_sub_score]
+
 def sort_items_with_tie_breaking(items, comparisons):
     """
     Sort items by points, using sub-scores to break ties.
@@ -199,17 +281,39 @@ def get_collection(collection_id):
     collection = Collection.query.get_or_404(collection_id)
     # Use tie-breaking sorting algorithm
     items = sort_items_with_tie_breaking(list(collection.items), list(collection.comparisons))
+    comparisons = list(collection.comparisons)
+    
+    # Group items by score for recursive sub-score calculation
+    items_by_score = {}
+    for item in items:
+        if item.points not in items_by_score:
+            items_by_score[item.points] = []
+        items_by_score[item.points].append(item)
+    
+    # Calculate recursive sub-scores for each item
+    items_data = []
+    for item in items:
+        items_with_same_score = items_by_score.get(item.points, [])
+        recursive_scores = calculate_recursive_sub_scores(item, items_with_same_score, comparisons)
+        
+        item_data = {
+            'id': item.id,
+            'name': item.name,
+            'media_link': item.media_link,
+            'points': item.points
+        }
+        
+        # Only include sub_scores if there's more than just the main score
+        if len(recursive_scores) > 1:
+            item_data['sub_scores'] = recursive_scores
+        
+        items_data.append(item_data)
     
     return jsonify({
         'id': collection.id,
         'name': collection.name,
         'search_prefix': collection.search_prefix,
-        'items': [{
-            'id': item.id,
-            'name': item.name,
-            'media_link': item.media_link,
-            'points': item.points
-        } for item in items],
+        'items': items_data,
         'comparisons_count': len(collection.comparisons)
     })
 
