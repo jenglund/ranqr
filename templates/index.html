@@ -687,7 +687,7 @@
             </div>
 
             <div id="fixed-triangles-section" class="card hidden">
-                <h3 class="section-title">Fixed Triangles</h3>
+                <h3 class="section-title">Resolve Triangles</h3>
                 <div id="triangles-container">
                     <div class="loading">Loading triangles...</div>
                 </div>
@@ -1260,12 +1260,23 @@
                     const editingId = `item-${item.id}`;
                     const searchUrl = getYouTubeSearchUrl(searchPrefix, item.name);
                     
+                    // Format score display with sub-scores if available
+                    let scoreDisplay = `${item.points > 0 ? '+' : ''}${item.points}`;
+                    if (item.sub_scores && item.sub_scores.length > 1) {
+                        // Format as X / Y / Z / ...
+                        const formattedScores = item.sub_scores.map(score => {
+                            return score > 0 ? `+${score}` : `${score}`;
+                        });
+                        scoreDisplay = formattedScores.join(' / ');
+                    }
+                    scoreDisplay += ' pts';
+                    
                     li.innerHTML = `
                         <div style="flex: 1; display: flex; flex-direction: column;">
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span class="rank-number">#${index + 1}</span>
                                 <span class="item-name" id="item-name-${item.id}">${escapeHtml(item.name)}</span>
-                                <span class="item-points ${pointsClass}">${item.points > 0 ? '+' : ''}${item.points} pts</span>
+                                <span class="item-points ${pointsClass}">${scoreDisplay}</span>
                             </div>
                             <div id="item-edit-${item.id}" class="hidden">
                                 <div class="edit-form">
