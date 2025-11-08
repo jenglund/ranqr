@@ -717,7 +717,7 @@
             </div>
 
             <div id="matchup-section" class="card hidden">
-                <h3 class="section-title">Pairwise Comparison</h3>
+                <h3 class="section-title" id="pairwise-comparison-header">Pairwise Comparison</h3>
                 <div id="matchup-container" class="matchup-container">
                     <div class="loading">Loading next matchup...</div>
                 </div>
@@ -1299,6 +1299,37 @@
                 
                 // Update center button and submit button state
                 updateVoteButtonStates();
+                
+                // Scroll to comparison container if we're loading after a previous vote
+                if (window.lastVote) {
+                    // Use setTimeout to ensure DOM is fully rendered before scrolling
+                    setTimeout(() => {
+                        const matchupSection = document.getElementById('matchup-section');
+                        const header = document.getElementById('pairwise-comparison-header');
+                        
+                        if (matchupSection && header) {
+                            const viewportHeight = window.innerHeight;
+                            const sectionRect = matchupSection.getBoundingClientRect();
+                            const sectionHeight = sectionRect.height;
+                            
+                            if (sectionHeight < viewportHeight) {
+                                // Container is smaller than viewport: scroll so bottom of container is at bottom of viewport
+                                const sectionBottomAbsolute = sectionRect.bottom + window.scrollY;
+                                const targetScrollPosition = sectionBottomAbsolute - viewportHeight;
+                                window.scrollTo({
+                                    top: targetScrollPosition,
+                                    behavior: 'smooth'
+                                });
+                            } else {
+                                // Container is larger than viewport: scroll so top of container (header) is at top of viewport
+                                header.scrollIntoView({
+                                    behavior: 'smooth',
+                                    block: 'start'
+                                });
+                            }
+                        }
+                    }, 100);
+                }
                 
                 // Keep last vote info - don't clear it, just update it when we vote
             } catch (error) {
