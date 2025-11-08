@@ -1373,7 +1373,11 @@
             return true;
         }
 
-        async function loadRankings() {
+        /**
+         * Update only the rankings list without reloading the histogram.
+         * This is used when histogram bars are clicked to filter rankings.
+         */
+        async function updateRankingsList() {
             if (isLoadingRankings) return; // Prevent concurrent loads
             isLoadingRankings = true;
             try {
@@ -1421,60 +1425,124 @@
                     </div>
                 `;
                 
-                // Load and render histogram
-                await loadHistogram();
+                // Render rankings list (without reloading histogram)
+                await renderRankingsList(filteredItems, collection.search_prefix || '');
+            } catch (error) {
+                console.error('Error updating rankings:', error);
+            } finally {
+                isLoadingRankings = false;
+            }
+        }
+
+        /**
+         * Render the rankings list items.
+         * Separated from loadRankings to allow updating list without reloading histogram.
+         */
+        async function renderRankingsList(filteredItems, searchPrefix) {
+            const listEl = document.getElementById('rankings-list');
+            listEl.innerHTML = '';
+            
+            filteredItems.forEach((item, index) => {
+                const li = document.createElement('li');
+                const pointsClass = item.points > 0 ? 'positive' : item.points < 0 ? 'negative' : '';
+                const editingId = `item-${item.id}`;
+                const searchUrl = getYouTubeSearchUrl(searchPrefix, item.name);
                 
-                const searchPrefix = collection.search_prefix || '';
+                // Format score display with sub-scores if available
+                let scoreDisplay = `${item.points > 0 ? '+' : ''}${item.points}`;
+                if (item.sub_scores && item.sub_scores.length > 1) {
+                    // Format as X / Y / Z / ...
+                    const formattedScores = item.sub_scores.map(score => {
+                        return score > 0 ? `+${score}` : `${score}`;
+                    });
+                    scoreDisplay = formattedScores.join(' / ');
+                }
+                scoreDisplay += ' pts';
                 
-                filteredItems.forEach((item, index) => {
-                    const li = document.createElement('li');
-                    const pointsClass = item.points > 0 ? 'positive' : item.points < 0 ? 'negative' : '';
-                    const editingId = `item-${item.id}`;
-                    const searchUrl = getYouTubeSearchUrl(searchPrefix, item.name);
-                    
-                    // Format score display with sub-scores if available
-                    let scoreDisplay = `${item.points > 0 ? '+' : ''}${item.points}`;
-                    if (item.sub_scores && item.sub_scores.length > 1) {
-                        // Format as X / Y / Z / ...
-                        const formattedScores = item.sub_scores.map(score => {
-                            return score > 0 ? `+${score}` : `${score}`;
-                        });
-                        scoreDisplay = formattedScores.join(' / ');
-                    }
-                    scoreDisplay += ' pts';
-                    
-                    li.innerHTML = `
-                        <div style="flex: 1; display: flex; flex-direction: column;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <span class="rank-number">#${index + 1}</span>
-                                <span class="item-name" id="item-name-${item.id}">${escapeHtml(item.name)}</span>
-                                <span class="item-points ${pointsClass}">${scoreDisplay}</span>
-                            </div>
-                            <div id="item-edit-${item.id}" class="hidden">
-                                <div class="edit-form">
-                                    <input type="text" id="item-name-input-${item.id}" value="${escapeHtml(item.name)}" placeholder="Item name">
-                                    <input type="text" id="item-media-input-${item.id}" value="${item.media_link || ''}" placeholder="YouTube link (optional)">
-                                    <button onclick="saveItemEdit(${item.id})">Save</button>
-                                    <button class="secondary" onclick="cancelItemEdit(${item.id})">Cancel</button>
-                                </div>
-                            </div>
-                            <div id="item-display-${item.id}">
-                                ${item.media_link ? (() => {
-                                    const normalizedUrl = normalizeYouTubeUrl(item.media_link);
-                                    const displayText = item.media_link;
-                                    return `<div class="media-link-display">📎 <a href="${escapeHtml(normalizedUrl)}" target="_blank">${escapeHtml(displayText)}</a></div>`;
-                                })() : ''}
-                                <div class="item-actions">
-                                    <a href="${escapeHtml(searchUrl)}" target="_blank" style="padding: 6px 12px; font-size: 0.85em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">🔍 Search YouTube</a>
-                                    <button onclick="autoFillYouTube(${item.id}, event)" style="padding: 6px 12px; font-size: 0.85em; background: #28a745; color: white;">🤖 Auto YT</button>
-                                    <button onclick="editItem(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">✏️ Edit</button>
-                                    <button onclick="viewItemVotes(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">📊 View Votes</button>
-                                </div>
+                li.innerHTML = `
+                    <div style="flex: 1; display: flex; flex-direction: column;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span class="rank-number">#${index + 1}</span>
+                            <span class="item-name" id="item-name-${item.id}">${escapeHtml(item.name)}</span>
+                            <span class="item-points ${pointsClass}">${scoreDisplay}</span>
+                        </div>
+                        <div id="item-edit-${item.id}" class="hidden">
+                            <div class="edit-form">
+                                <input type="text" id="item-name-input-${item.id}" value="${escapeHtml(item.name)}" placeholder="Item name">
+                                <input type="text" id="item-media-input-${item.id}" value="${item.media_link || ''}" placeholder="YouTube link (optional)">
+                                <button onclick="saveItemEdit(${item.id})">Save</button>
+                                <button class="secondary" onclick="cancelItemEdit(${item.id})">Cancel</button>
                             </div>
                         </div>
-                    `;
-                    listEl.appendChild(li);
-                });
+                        <div id="item-display-${item.id}">
+                            ${item.media_link ? (() => {
+                                const normalizedUrl = normalizeYouTubeUrl(item.media_link);
+                                const displayText = item.media_link;
+                                return `<div class="media-link-display">📎 <a href="${escapeHtml(normalizedUrl)}" target="_blank">${escapeHtml(displayText)}</a></div>`;
+                            })() : ''}
+                            <div class="item-actions">
+                                <a href="${escapeHtml(searchUrl)}" target="_blank" style="padding: 6px 12px; font-size: 0.85em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">🔍 Search YouTube</a>
+                                <button onclick="autoFillYouTube(${item.id}, event)" style="padding: 6px 12px; font-size: 0.85em; background: #28a745; color: white;">🤖 Auto YT</button>
+                                <button onclick="editItem(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">✏️ Edit</button>
+                                <button onclick="viewItemVotes(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">📊 View Votes</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                listEl.appendChild(li);
+            });
+        }
+
+        async function loadRankings() {
+            if (isLoadingRankings) return; // Prevent concurrent loads
+            isLoadingRankings = true;
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}`);
+                const collection = await response.json();
+                
+                // Filter items based on selected score paths
+                let filteredItems = collection.items;
+                if (selectedScorePaths.size > 0) {
+                    // Convert Set of JSON strings back to arrays
+                    const scorePaths = Array.from(selectedScorePaths).map(pathStr => JSON.parse(pathStr));
+                    filteredItems = collection.items.filter(item => {
+                        // Item matches if it matches ANY selected score path
+                        return scorePaths.some(scorePath => itemMatchesScorePath(item, scorePath));
+                    });
+                }
+                
+                const totalItems = collection.items.length;
+                const filteredItemsCount = filteredItems.length;
+                const totalComparisons = collection.comparisons_count;
+                const maxComparisons = (totalItems * (totalItems - 1)) / 2;
+                
+                // Update stats
+                const statsEl = document.getElementById('stats');
+                statsEl.classList.remove('hidden');
+                statsEl.innerHTML = `
+                    <div class="stat-card">
+                        <div class="value">${filteredItemsCount}${filteredItemsCount !== totalItems ? ` / ${totalItems}` : ''}</div>
+                        <div class="label">${filteredItemsCount !== totalItems ? 'Filtered' : 'Total'} Items</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">${totalComparisons}</div>
+                        <div class="label">Comparisons Made</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">${maxComparisons}</div>
+                        <div class="label">Max Comparisons</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">${maxComparisons > 0 ? Math.round((totalComparisons / maxComparisons) * 100) : 0}%</div>
+                        <div class="label">Progress</div>
+                    </div>
+                `;
+                
+                // Load and render histogram (full reload)
+                await loadHistogram();
+                
+                // Render rankings list
+                await renderRankingsList(filteredItems, collection.search_prefix || '');
             } catch (error) {
                 console.error('Error loading rankings:', error);
                 alert('Error loading rankings');
@@ -2634,9 +2702,9 @@
                         }
                     }
                     
-                    // Reload rankings to apply filtering (only if not already loading)
+                    // Update rankings list to apply filtering (without reloading histogram)
                     if (!isLoadingRankings) {
-                        await loadRankings();
+                        await updateRankingsList();
                     }
                 });
             });
@@ -2654,6 +2722,12 @@
                         const childRow = document.getElementById(childRowId);
                         if (childRow) {
                             childRow.style.display = 'block';
+                        } else {
+                            // Child histogram doesn't exist yet - load it
+                            const currentLevel = parseInt(bar.getAttribute('data-level')) || 0;
+                            loadChildHistogram(scorePath, currentLevel + 1).catch(err => {
+                                console.error('Error restoring child histogram:', err);
+                            });
                         }
                     }
                 }
