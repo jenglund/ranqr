@@ -2590,9 +2590,19 @@
                     const sameHistogramBars = getBarsInSameHistogram(this);
                     
                     // Remove all score paths from bars in the same histogram from selectedScorePaths
+                    // and close their child histograms
                     sameHistogramBars.forEach(b => {
                         const barScorePathJson = b.getAttribute('data-score-path');
                         if (barScorePathJson) {
+                            // Check if this bar has a child histogram that needs to be closed
+                            const barScorePath = JSON.parse(barScorePathJson);
+                            const barChildRowId = `histogram-row-${barScorePath.join('-')}`;
+                            const barChildRow = document.getElementById(barChildRowId);
+                            if (barChildRow) {
+                                // Close the child histogram and all its descendants
+                                closeHistogramAndChildren(barChildRow);
+                            }
+                            
                             selectedScorePaths.delete(barScorePathJson);
                         }
                         b.classList.remove('clicked');
