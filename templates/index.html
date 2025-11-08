@@ -132,6 +132,9 @@
             .matchup-items-row .matchup-item {
                 width: 100%;
             }
+            .matchup-vs-btn {
+                margin: 20px 0;
+            }
         }
 
         .matchup-item {
@@ -143,6 +146,56 @@
             text-align: center;
             background: #f8f9fa;
             transition: border-color 0.3s ease;
+        }
+
+        .matchup-item.clickable-item {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .matchup-item.clickable-item:hover {
+            border-color: #667eea;
+        }
+
+        .matchup-item.clickable-item.selected {
+            border-color: #28a745;
+            border-width: 4px;
+            background: #f0fff4;
+        }
+
+        .item-interactive-elements {
+            position: relative;
+            z-index: 1;
+        }
+
+        .matchup-vs-btn {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            background: white;
+            border: 3px solid #667eea;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 0;
+            margin: 0 20px;
+        }
+
+        .matchup-vs-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .matchup-vs-btn.selected {
+            background: #6c757d;
+            border-color: #6c757d;
+            color: white;
         }
 
         .matchup-vs {
@@ -187,6 +240,24 @@
         .vote-select-btn.selected.secondary {
             background: #6c757d;
             box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
+        }
+
+        .submit-vote-btn-inactive {
+            background: #6c757d !important;
+            color: white !important;
+            cursor: not-allowed !important;
+            opacity: 0.6;
+        }
+
+        #submit-vote-btn:not(.submit-vote-btn-inactive) {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+        }
+
+        #submit-vote-btn:not(.submit-vote-btn-inactive):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
         .collections-list {
@@ -1096,37 +1167,32 @@
                 
                 container.innerHTML = `
                     <div class="matchup-items-row">
-                        <div class="matchup-item" id="item1-container">
+                        <div class="matchup-item clickable-item" id="item1-container" data-item="item1">
                             <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
-                                <div style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
+                                <div class="item-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
                                     <a href="${escapeHtml(searchUrl1)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
                                     <button onclick="autoFillYouTube(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
                                     <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
                                 </div>
                                 <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item1.name)}</div>
-                                ${video1 ? `<div>${video1}</div>` : ''}
+                                ${video1 ? `<div class="item-interactive-elements">${video1}</div>` : ''}
                             </div>
                         </div>
-                        <div class="matchup-vs">VS</div>
-                        <div class="matchup-item" id="item2-container">
+                        <button class="matchup-vs-btn" id="tie-button" onclick="selectVote('tie')">?</button>
+                        <div class="matchup-item clickable-item" id="item2-container" data-item="item2">
                             <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
-                                <div style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
+                                <div class="item-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
                                     <a href="${escapeHtml(searchUrl2)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
                                     <button onclick="autoFillYouTube(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
                                     <button onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
                                 </div>
                                 <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item2.name)}</div>
-                                ${video2 ? `<div>${video2}</div>` : ''}
+                                ${video2 ? `<div class="item-interactive-elements">${video2}</div>` : ''}
                             </div>
                         </div>
                     </div>
-                    <div class="matchup-buttons" style="margin-top: 30px;">
-                        <button onclick="selectVote('item1')" id="select-item1" class="vote-select-btn">${escapeHtml(data.item1.name)} Wins</button>
-                        <button onclick="selectVote('tie')" id="select-tie" class="vote-select-btn secondary">Tie</button>
-                        <button onclick="selectVote('item2')" id="select-item2" class="vote-select-btn">${escapeHtml(data.item2.name)} Wins</button>
-                    </div>
                     <div id="submit-vote-section" style="margin-top: 20px; text-align: center;">
-                        <button onclick="submitSelectedVote()" id="submit-vote-btn" disabled style="padding: 12px 32px; font-size: 1.1em;">Submit Vote</button>
+                        <button onclick="submitSelectedVote()" id="submit-vote-btn" disabled class="submit-vote-btn-inactive" style="padding: 12px 32px; font-size: 1.1em;">Submit</button>
                     </div>
                     <div style="width: 100%; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;">
                         <button onclick="revealScores()" style="padding: 10px 20px; font-size: 0.95em; background: #6c757d; color: white;">📊 Reveal Scores</button>
@@ -1151,14 +1217,40 @@
                 // Clear selected vote when loading new matchup
                 selectedVote = null;
                 
-                // Clear button selections and disable submit button
-                document.querySelectorAll('.vote-select-btn').forEach(btn => {
-                    btn.classList.remove('selected');
-                });
-                const submitBtn = document.getElementById('submit-vote-btn');
-                if (submitBtn) {
-                    submitBtn.disabled = true;
+                // Set up container click handlers
+                const item1Container = document.getElementById('item1-container');
+                const item2Container = document.getElementById('item2-container');
+                
+                if (item1Container) {
+                    item1Container.addEventListener('click', function(e) {
+                        // Don't trigger if clicking on interactive elements or their children
+                        if (e.target.closest('.item-interactive-elements') || 
+                            e.target.tagName === 'A' || 
+                            e.target.tagName === 'BUTTON' ||
+                            e.target.closest('iframe')) {
+                            return;
+                        }
+                        e.stopPropagation();
+                        selectVote('item1');
+                    });
                 }
+                
+                if (item2Container) {
+                    item2Container.addEventListener('click', function(e) {
+                        // Don't trigger if clicking on interactive elements or their children
+                        if (e.target.closest('.item-interactive-elements') || 
+                            e.target.tagName === 'A' || 
+                            e.target.tagName === 'BUTTON' ||
+                            e.target.closest('iframe')) {
+                            return;
+                        }
+                        e.stopPropagation();
+                        selectVote('item2');
+                    });
+                }
+                
+                // Update center button and submit button state
+                updateVoteButtonStates();
                 
                 // Keep last vote info - don't clear it, just update it when we vote
             } catch (error) {
@@ -1170,41 +1262,70 @@
 
         let selectedVote = null;
 
-        function selectVote(winner) {
-            const buttonId = winner === 'item1' ? 'select-item1' : winner === 'item2' ? 'select-item2' : 'select-tie';
-            const button = document.getElementById(buttonId);
+        function updateVoteButtonStates() {
+            const tieButton = document.getElementById('tie-button');
+            const item1Container = document.getElementById('item1-container');
+            const item2Container = document.getElementById('item2-container');
+            const submitBtn = document.getElementById('submit-vote-btn');
             
-            // Toggle selection: if clicking the same button that's already selected, deselect it
-            if (selectedVote === winner && button && button.classList.contains('selected')) {
+            // Update center button symbol
+            if (tieButton) {
+                if (selectedVote === null) {
+                    tieButton.textContent = '?';
+                    tieButton.classList.remove('selected');
+                } else if (selectedVote === 'tie') {
+                    tieButton.textContent = '=';
+                    tieButton.classList.add('selected');
+                } else if (selectedVote === 'item1') {
+                    tieButton.textContent = '>';
+                    tieButton.classList.remove('selected');
+                } else if (selectedVote === 'item2') {
+                    tieButton.textContent = '<';
+                    tieButton.classList.remove('selected');
+                }
+            }
+            
+            // Update container selection states
+            if (item1Container) {
+                if (selectedVote === 'item1') {
+                    item1Container.classList.add('selected');
+                } else {
+                    item1Container.classList.remove('selected');
+                }
+            }
+            
+            if (item2Container) {
+                if (selectedVote === 'item2') {
+                    item2Container.classList.add('selected');
+                } else {
+                    item2Container.classList.remove('selected');
+                }
+            }
+            
+            // Update submit button state
+            if (submitBtn) {
+                if (selectedVote === null) {
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('submit-vote-btn-inactive');
+                } else {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('submit-vote-btn-inactive');
+                }
+            }
+        }
+
+        function selectVote(winner) {
+            // Toggle selection: if clicking the same option that's already selected, deselect it
+            if (selectedVote === winner) {
                 // Deselect: remove selection
                 selectedVote = null;
-                button.classList.remove('selected');
-                
-                // Disable submit button
-                const submitBtn = document.getElementById('submit-vote-btn');
-                if (submitBtn) {
-                    submitBtn.disabled = true;
-                }
             } else {
                 // Select: set new selection
                 selectedVote = winner;
-                
-                // Remove selected class from all buttons
-                document.querySelectorAll('.vote-select-btn').forEach(btn => {
-                    btn.classList.remove('selected');
-                });
-                
-                // Add selected class to clicked button
-                if (button) {
-                    button.classList.add('selected');
-                }
-                
-                // Enable submit button
-                const submitBtn = document.getElementById('submit-vote-btn');
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                }
             }
+            
+            // Update all button and container states
+            updateVoteButtonStates();
         }
 
         async function submitSelectedVote() {
@@ -1215,6 +1336,7 @@
             
             await submitMatchup(selectedVote);
             selectedVote = null; // Clear selection after submission
+            updateVoteButtonStates(); // Update UI to reflect cleared state
         }
 
         async function submitMatchup(winner) {
