@@ -1125,11 +1125,8 @@
                         <button onclick="selectVote('tie')" id="select-tie" class="vote-select-btn secondary">Tie</button>
                         <button onclick="selectVote('item2')" id="select-item2" class="vote-select-btn">${escapeHtml(data.item2.name)} Wins</button>
                     </div>
-                    <div id="submit-vote-section" class="hidden" style="margin-top: 20px; text-align: center;">
-                        <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #667eea;">
-                            <strong>Selected:</strong> <span id="selected-vote-text"></span>
-                        </div>
-                        <button onclick="submitSelectedVote()" id="submit-vote-btn" style="padding: 12px 32px; font-size: 1.1em;">Submit Vote</button>
+                    <div id="submit-vote-section" style="margin-top: 20px; text-align: center;">
+                        <button onclick="submitSelectedVote()" id="submit-vote-btn" disabled style="padding: 12px 32px; font-size: 1.1em;">Submit Vote</button>
                     </div>
                     <div style="width: 100%; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;">
                         <button onclick="revealScores()" style="padding: 10px 20px; font-size: 0.95em; background: #6c757d; color: white;">📊 Reveal Scores</button>
@@ -1154,6 +1151,15 @@
                 // Clear selected vote when loading new matchup
                 selectedVote = null;
                 
+                // Clear button selections and disable submit button
+                document.querySelectorAll('.vote-select-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+                const submitBtn = document.getElementById('submit-vote-btn');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                }
+                
                 // Keep last vote info - don't clear it, just update it when we vote
             } catch (error) {
                 console.error('Error loading matchup:', error);
@@ -1165,35 +1171,38 @@
         let selectedVote = null;
 
         function selectVote(winner) {
-            selectedVote = winner;
-            
-            // Remove selected class from all buttons
-            document.querySelectorAll('.vote-select-btn').forEach(btn => {
-                btn.classList.remove('selected');
-            });
-            
-            // Add selected class to clicked button
             const buttonId = winner === 'item1' ? 'select-item1' : winner === 'item2' ? 'select-item2' : 'select-tie';
             const button = document.getElementById(buttonId);
-            if (button) {
-                button.classList.add('selected');
-            }
             
-            // Show submit section
-            const submitSection = document.getElementById('submit-vote-section');
-            if (submitSection) {
-                submitSection.classList.remove('hidden');
-            }
-            
-            // Update selected vote text
-            const voteText = document.getElementById('selected-vote-text');
-            if (voteText) {
-                if (winner === 'item1') {
-                    voteText.textContent = window.currentMatchup ? `${window.currentMatchup.item1_name} Wins` : 'A Wins';
-                } else if (winner === 'item2') {
-                    voteText.textContent = window.currentMatchup ? `${window.currentMatchup.item2_name} Wins` : 'B Wins';
-                } else {
-                    voteText.textContent = 'Tie';
+            // Toggle selection: if clicking the same button that's already selected, deselect it
+            if (selectedVote === winner && button && button.classList.contains('selected')) {
+                // Deselect: remove selection
+                selectedVote = null;
+                button.classList.remove('selected');
+                
+                // Disable submit button
+                const submitBtn = document.getElementById('submit-vote-btn');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                }
+            } else {
+                // Select: set new selection
+                selectedVote = winner;
+                
+                // Remove selected class from all buttons
+                document.querySelectorAll('.vote-select-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+                
+                // Add selected class to clicked button
+                if (button) {
+                    button.classList.add('selected');
+                }
+                
+                // Enable submit button
+                const submitBtn = document.getElementById('submit-vote-btn');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
                 }
             }
         }
