@@ -733,6 +733,10 @@
     <script>
         let currentCollectionId = null;
         let currentCollection = null;
+        // Track selected histogram score paths for filtering rankings
+        let selectedScorePaths = new Set();
+        // Flag to prevent infinite loops when reloading rankings
+        let isLoadingRankings = false;
 
         // Initialize
         window.onload = () => {
@@ -819,6 +823,8 @@
 
         async function openCollection(id) {
             currentCollectionId = id;
+            // Clear histogram selections when switching collections
+            selectedScorePaths.clear();
             try {
                 const response = await fetch(`/api/collections/${id}`);
                 currentCollection = await response.json();
@@ -1336,7 +1342,40 @@
             }
         }
 
+        /**
+         * Check if an item matches a given score path.
+         * A score path is an array like [5, 2, 1] representing main score, sub-score, sub-sub-score, etc.
+         */
+        function itemMatchesScorePath(item, scorePath) {
+            if (!scorePath || scorePath.length === 0) {
+                return true; // Empty path matches all items
+            }
+            
+            // Check main score (first element)
+            if (item.points !== scorePath[0]) {
+                return false;
+            }
+            
+            // If there are sub-scores, check them
+            if (scorePath.length > 1) {
+                if (!item.sub_scores || item.sub_scores.length < scorePath.length) {
+                    return false; // Item doesn't have enough sub-score levels
+                }
+                
+                // Check each level of sub-scores
+                for (let i = 1; i < scorePath.length; i++) {
+                    if (item.sub_scores[i] !== scorePath[i]) {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+        }
+
         async function loadRankings() {
+            if (isLoadingRankings) return; // Prevent concurrent loads
+            isLoadingRankings = true;
             try {
                 const response = await fetch(`/api/collections/${currentCollectionId}`);
                 const collection = await response.json();
@@ -1344,7 +1383,19 @@
                 const listEl = document.getElementById('rankings-list');
                 listEl.innerHTML = '';
                 
+                // Filter items based on selected score paths
+                let filteredItems = collection.items;
+                if (selectedScorePaths.size > 0) {
+                    // Convert Set of JSON strings back to arrays
+                    const scorePaths = Array.from(selectedScorePaths).map(pathStr => JSON.parse(pathStr));
+                    filteredItems = collection.items.filter(item => {
+                        // Item matches if it matches ANY selected score path
+                        return scorePaths.some(scorePath => itemMatchesScorePath(item, scorePath));
+                    });
+                }
+                
                 const totalItems = collection.items.length;
+                const filteredItemsCount = filteredItems.length;
                 const totalComparisons = collection.comparisons_count;
                 const maxComparisons = (totalItems * (totalItems - 1)) / 2;
                 
@@ -1353,8 +1404,8 @@
                 statsEl.classList.remove('hidden');
                 statsEl.innerHTML = `
                     <div class="stat-card">
-                        <div class="value">${totalItems}</div>
-                        <div class="label">Total Items</div>
+                        <div class="value">${filteredItemsCount}${filteredItemsCount !== totalItems ? ` / ${totalItems}` : ''}</div>
+                        <div class="label">${filteredItemsCount !== totalItems ? 'Filtered' : 'Total'} Items</div>
                     </div>
                     <div class="stat-card">
                         <div class="value">${totalComparisons}</div>
@@ -1375,7 +1426,7 @@
                 
                 const searchPrefix = collection.search_prefix || '';
                 
-                collection.items.forEach((item, index) => {
+                filteredItems.forEach((item, index) => {
                     const li = document.createElement('li');
                     const pointsClass = item.points > 0 ? 'positive' : item.points < 0 ? 'negative' : '';
                     const editingId = `item-${item.id}`;
@@ -1427,6 +1478,8 @@
             } catch (error) {
                 console.error('Error loading rankings:', error);
                 alert('Error loading rankings');
+            } finally {
+                isLoadingRankings = false;
             }
         }
 
@@ -2336,7 +2389,21 @@
                         const parentBar = document.getElementById(parentBarId);
                         if (parentBar) {
                             parentBar.classList.remove('clicked');
+                            // Remove from selectedScorePaths
+                            const parentBarScorePathJson = parentBar.getAttribute('data-score-path');
+                            if (parentBarScorePathJson) {
+                                selectedScorePaths.delete(parentBarScorePathJson);
+                            }
                         }
+                        
+                        // Remove all bars in this child row from selectedScorePaths
+                        const childBars = childRow.querySelectorAll('.histogram-bar');
+                        childBars.forEach(bar => {
+                            const barScorePathJson = bar.getAttribute('data-score-path');
+                            if (barScorePathJson) {
+                                selectedScorePaths.delete(barScorePathJson);
+                            }
+                        });
                     }
                 }
             });
@@ -2351,7 +2418,21 @@
             const parentBar = document.getElementById(parentBarId);
             if (parentBar) {
                 parentBar.classList.remove('clicked');
+                // Remove from selectedScorePaths
+                const parentBarScorePathJson = parentBar.getAttribute('data-score-path');
+                if (parentBarScorePathJson) {
+                    selectedScorePaths.delete(parentBarScorePathJson);
+                }
             }
+            
+            // Remove all bars in this row from selectedScorePaths
+            const rowBars = row.querySelectorAll('.histogram-bar');
+            rowBars.forEach(bar => {
+                const barScorePathJson = bar.getAttribute('data-score-path');
+                if (barScorePathJson) {
+                    selectedScorePaths.delete(barScorePathJson);
+                }
+            });
         }
         
         async function loadHistogram() {
@@ -2499,11 +2580,8 @@
                     const hasSubScores = this.getAttribute('data-has-sub-scores') === 'true';
                     const currentLevel = parseInt(this.getAttribute('data-level')) || 0;
                     
-                    if (!hasSubScores) {
-                        return; // No drill-down available
-                    }
-                    
                     const newScorePath = JSON.parse(scorePathJson);
+                    const scorePathKey = scorePathJson; // Use JSON string as key for Set
                     
                     // Check if this bar is currently selected BEFORE unselecting others
                     const isCurrentlySelected = this.classList.contains('clicked');
@@ -2511,8 +2589,12 @@
                     // Get all bars in the same histogram (same container/row)
                     const sameHistogramBars = getBarsInSameHistogram(this);
                     
-                    // Unselect all bars in the same histogram
+                    // Remove all score paths from bars in the same histogram from selectedScorePaths
                     sameHistogramBars.forEach(b => {
+                        const barScorePathJson = b.getAttribute('data-score-path');
+                        if (barScorePathJson) {
+                            selectedScorePaths.delete(barScorePathJson);
+                        }
                         b.classList.remove('clicked');
                     });
                     
@@ -2526,18 +2608,45 @@
                             closeHistogramAndChildren(existingChildRow);
                         }
                     } else {
-                        // Select this bar and show/load child histogram
+                        // Select this bar for filtering
                         this.classList.add('clicked');
+                        selectedScorePaths.add(scorePathKey);
                         
-                        if (existingChildRow) {
-                            // Show existing child histogram
-                            existingChildRow.style.display = 'block';
-                        } else {
-                            // Load and render child histogram
-                            await loadChildHistogram(newScorePath, currentLevel + 1);
+                        // If bar has sub-scores, also handle drill-down
+                        if (hasSubScores) {
+                            if (existingChildRow) {
+                                // Show existing child histogram
+                                existingChildRow.style.display = 'block';
+                            } else {
+                                // Load and render child histogram
+                                await loadChildHistogram(newScorePath, currentLevel + 1);
+                            }
                         }
                     }
+                    
+                    // Reload rankings to apply filtering (only if not already loading)
+                    if (!isLoadingRankings) {
+                        await loadRankings();
+                    }
                 });
+            });
+            
+            // Restore clicked state for bars that are in selectedScorePaths
+            bars.forEach(bar => {
+                const barScorePathJson = bar.getAttribute('data-score-path');
+                if (barScorePathJson && selectedScorePaths.has(barScorePathJson)) {
+                    bar.classList.add('clicked');
+                    // If bar has sub-scores, also restore nested histogram visibility
+                    const hasSubScores = bar.getAttribute('data-has-sub-scores') === 'true';
+                    if (hasSubScores) {
+                        const scorePath = JSON.parse(barScorePathJson);
+                        const childRowId = `histogram-row-${scorePath.join('-')}`;
+                        const childRow = document.getElementById(childRowId);
+                        if (childRow) {
+                            childRow.style.display = 'block';
+                        }
+                    }
+                }
             });
         }
 
