@@ -1160,9 +1160,9 @@
                         </div>
                     </div>
                     <div class="matchup-buttons" style="margin-top: 30px;">
-                        <button onclick="selectVote('item1')" id="select-item1" class="vote-select-btn">A Wins</button>
+                        <button onclick="selectVote('item1')" id="select-item1" class="vote-select-btn">${escapeHtml(data.item1.name)} Wins</button>
                         <button onclick="selectVote('tie')" id="select-tie" class="vote-select-btn secondary">Tie</button>
-                        <button onclick="selectVote('item2')" id="select-item2" class="vote-select-btn">B Wins</button>
+                        <button onclick="selectVote('item2')" id="select-item2" class="vote-select-btn">${escapeHtml(data.item2.name)} Wins</button>
                     </div>
                     <div id="submit-vote-section" class="hidden" style="margin-top: 20px; text-align: center;">
                         <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #667eea;">
@@ -1228,9 +1228,9 @@
             const voteText = document.getElementById('selected-vote-text');
             if (voteText) {
                 if (winner === 'item1') {
-                    voteText.textContent = 'A Wins';
+                    voteText.textContent = window.currentMatchup ? `${window.currentMatchup.item1_name} Wins` : 'A Wins';
                 } else if (winner === 'item2') {
-                    voteText.textContent = 'B Wins';
+                    voteText.textContent = window.currentMatchup ? `${window.currentMatchup.item2_name} Wins` : 'B Wins';
                 } else {
                     voteText.textContent = 'Tie';
                 }
