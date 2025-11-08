@@ -334,6 +334,8 @@ def get_score_distribution(collection_id):
     
     # Build distribution data with sub-scores
     distribution = []
+    histogram_has_single_bar = len(items_by_score) == 1
+    
     for score in sorted(items_by_score.keys(), reverse=True):
         items_in_group = items_by_score[score]
         
@@ -346,13 +348,19 @@ def get_score_distribution(collection_id):
             sub_score = sub_scores[item.id]
             sub_score_counts[sub_score] = sub_score_counts.get(sub_score, 0) + 1
         
-        distribution.append({
-            'score': score,
-            'count': len(items_in_group),
-            'sub_score_distribution': [
+        # Only include sub_score_distribution if histogram doesn't have a single bar
+        # (Exception: single bar histogram should not trigger nested display)
+        sub_score_distribution = []
+        if not histogram_has_single_bar and len(items_in_group) > 1:
+            sub_score_distribution = [
                 {'sub_score': sub_score, 'count': count}
                 for sub_score, count in sorted(sub_score_counts.items(), reverse=True)
             ]
+        
+        distribution.append({
+            'score': score,
+            'count': len(items_in_group),
+            'sub_score_distribution': sub_score_distribution
         })
     
     return jsonify({
@@ -392,6 +400,8 @@ def get_recursive_score_distribution(collection_id):
             items_by_score[score].append(item)
         
         distribution = []
+        histogram_has_single_bar = len(items_by_score) == 1
+        
         for score in sorted(items_by_score.keys(), reverse=True):
             items_in_group = items_by_score[score]
             sub_scores = calculate_sub_scores(items_in_group, comparisons)
@@ -400,13 +410,19 @@ def get_recursive_score_distribution(collection_id):
                 sub_score = sub_scores[item.id]
                 sub_score_counts[sub_score] = sub_score_counts.get(sub_score, 0) + 1
             
-            distribution.append({
-                'score': score,
-                'count': len(items_in_group),
-                'sub_score_distribution': [
+            # Only include sub_score_distribution if histogram doesn't have a single bar
+            # (Exception: single bar histogram should not trigger nested display)
+            sub_score_distribution = []
+            if not histogram_has_single_bar and len(items_in_group) > 1:
+                sub_score_distribution = [
                     {'sub_score': sub_score, 'count': count}
                     for sub_score, count in sorted(sub_score_counts.items(), reverse=True)
                 ]
+            
+            distribution.append({
+                'score': score,
+                'count': len(items_in_group),
+                'sub_score_distribution': sub_score_distribution
             })
         
         return jsonify({
@@ -452,14 +468,10 @@ def get_recursive_score_distribution(collection_id):
         sub_score = sub_scores[item.id]
         sub_score_counts[sub_score] = sub_score_counts.get(sub_score, 0) + 1
     
-    # Check if all sub-scores are the same (all 0 or all same value)
+    # Build distribution - show even if all sub-scores are the same (for better UX)
+    # But we'll mark whether there are multiple unique values for frontend logic
     unique_sub_scores = set(sub_score_counts.keys())
-    if len(unique_sub_scores) <= 1:
-        # No further drill-down possible
-        return jsonify({
-            'distribution': [],
-            'score_path': score_path
-        })
+    has_multiple_unique_scores = len(unique_sub_scores) > 1
     
     distribution = [{
         'score': sub_score,
@@ -468,6 +480,10 @@ def get_recursive_score_distribution(collection_id):
     } for sub_score, count in sorted(sub_score_counts.items(), reverse=True)]
     
     # Pre-calculate next level sub-score distributions for each sub-score
+    # Show nested histogram even if there's only one value (better UX)
+    # Exception: If there's only one bar in this histogram, don't show nested
+    histogram_has_single_bar = len(distribution) == 1
+    
     for dist_item in distribution:
         sub_score = dist_item['score']
         # Get items with this sub-score
@@ -482,9 +498,10 @@ def get_recursive_score_distribution(collection_id):
                 sub_sub_score = sub_sub_scores[item.id]
                 sub_sub_score_counts[sub_sub_score] = sub_sub_score_counts.get(sub_sub_score, 0) + 1
             
-            # Only include if there are multiple unique sub-sub-scores
-            unique_sub_sub_scores = set(sub_sub_score_counts.keys())
-            if len(unique_sub_sub_scores) > 1:
+            # Include sub_score_distribution even if there's only one unique value
+            # (for consistent UX), but only if this histogram doesn't have a single bar
+            # Exception: If histogram has only one bar, don't show nested histogram
+            if not histogram_has_single_bar:
                 dist_item['sub_score_distribution'] = [
                     {'sub_score': sub_sub_score, 'count': count}
                     for sub_sub_score, count in sorted(sub_sub_score_counts.items(), reverse=True)
