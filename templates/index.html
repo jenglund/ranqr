@@ -193,9 +193,23 @@
         }
 
         .matchup-vs-btn.selected {
-            background: #6c757d;
-            border-color: #6c757d;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border-color: #28a745;
             color: white;
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .matchup-vs-btn.selected:hover {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            transform: scale(1.05);
+        }
+
+        .matchup-vs-btn:focus {
+            outline: none;
+        }
+
+        .matchup-vs-btn:active {
+            transform: scale(0.95);
         }
 
         .matchup-vs {
@@ -258,6 +272,31 @@
         #submit-vote-btn:not(.submit-vote-btn-inactive):hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #submit-vote-btn.submitting {
+            background: #6c757d !important;
+            color: white !important;
+            cursor: not-allowed !important;
+            opacity: 0.8;
+            position: relative;
+        }
+
+        #submit-vote-btn.submitting::after {
+            content: '';
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin-left: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         .collections-list {
@@ -1249,6 +1288,15 @@
                     });
                 }
                 
+                // Clear selected vote when loading new matchup
+                selectedVote = null;
+                
+                // Clear any submitting state from submit button
+                const submitBtn = document.getElementById('submit-vote-btn');
+                if (submitBtn) {
+                    submitBtn.classList.remove('submitting');
+                }
+                
                 // Update center button and submit button state
                 updateVoteButtonStates();
                 
@@ -1283,6 +1331,10 @@
                     tieButton.textContent = '<';
                     tieButton.classList.remove('selected');
                 }
+                // Remove focus to prevent weird color changes when clicking elsewhere
+                if (document.activeElement === tieButton) {
+                    tieButton.blur();
+                }
             }
             
             // Update container selection states
@@ -1304,12 +1356,15 @@
             
             // Update submit button state
             if (submitBtn) {
-                if (selectedVote === null) {
-                    submitBtn.disabled = true;
-                    submitBtn.classList.add('submit-vote-btn-inactive');
-                } else {
-                    submitBtn.disabled = false;
-                    submitBtn.classList.remove('submit-vote-btn-inactive');
+                // Don't change button state if it's currently submitting
+                if (!submitBtn.classList.contains('submitting')) {
+                    if (selectedVote === null) {
+                        submitBtn.disabled = true;
+                        submitBtn.classList.add('submit-vote-btn-inactive');
+                    } else {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('submit-vote-btn-inactive');
+                    }
                 }
             }
         }
@@ -1334,9 +1389,40 @@
                 return;
             }
             
-            await submitMatchup(selectedVote);
-            selectedVote = null; // Clear selection after submission
-            updateVoteButtonStates(); // Update UI to reflect cleared state
+            // Store pre-submit state for potential revert
+            const preSubmitState = {
+                selectedVote: selectedVote,
+                currentMatchup: {...window.currentMatchup}
+            };
+            
+            // Disable submit button and show spinner
+            const submitBtn = document.getElementById('submit-vote-btn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('submitting');
+                submitBtn.classList.remove('submit-vote-btn-inactive');
+            }
+            
+            try {
+                await submitMatchup(selectedVote);
+                // On success, loadNextMatchup will clear the state, so we don't need to do anything here
+            } catch (error) {
+                // Revert to pre-submit state on failure
+                selectedVote = preSubmitState.selectedVote;
+                window.currentMatchup = preSubmitState.currentMatchup;
+                updateVoteButtonStates();
+                
+                // Remove submitting state from button
+                if (submitBtn) {
+                    submitBtn.classList.remove('submitting');
+                    if (selectedVote === null) {
+                        submitBtn.disabled = true;
+                        submitBtn.classList.add('submit-vote-btn-inactive');
+                    } else {
+                        submitBtn.disabled = false;
+                    }
+                }
+            }
         }
 
         async function submitMatchup(winner) {
@@ -1353,29 +1439,24 @@
                 winner: result
             };
             
-            try {
-                const response = await fetch(`/api/collections/${currentCollectionId}/matchup`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        item1_id: window.currentMatchup.item1_id,
-                        item2_id: window.currentMatchup.item2_id,
-                        winner: result
-                    })
-                });
-                
-                if (response.ok) {
-                    await loadRankings(); // Update rankings
-                    await loadNextMatchup(); // Load next matchup
-                } else {
-                    alert('Error submitting matchup');
-                    window.lastVote = null; // Clear on error
-                }
-            } catch (error) {
-                console.error('Error submitting matchup:', error);
-                alert('Error submitting matchup');
-                window.lastVote = null; // Clear on error
+            const response = await fetch(`/api/collections/${currentCollectionId}/matchup`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    item1_id: window.currentMatchup.item1_id,
+                    item2_id: window.currentMatchup.item2_id,
+                    winner: result
+                })
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Error submitting matchup: ${errorText}`);
             }
+            
+            // On success, update rankings and load next matchup
+            await loadRankings(); // Update rankings
+            await loadNextMatchup(); // Load next matchup (this will clear selectedVote and update button states)
         }
 
         async function revealScores() {
