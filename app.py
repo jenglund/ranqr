@@ -665,6 +665,138 @@ def resolve_triangle(collection_id):
     
     return jsonify({'success': True})
 
+def calculate_swap_impact(collection, comp_to_swap, items_dict, comparisons, current_total_controversy):
+    """
+    Calculate the net impact on total controversy if a vote is swapped.
+    
+    Swapping a vote means:
+    - The item that was losing but voted as better gets +2 points
+    - The item that was winning but voted as worse gets -2 points
+    
+    Args:
+        collection: Collection object
+        comp_to_swap: Comparison object to swap
+        items_dict: Dictionary mapping item_id to Item object
+        comparisons: List of all Comparison objects
+        current_total_controversy: Current total controversy score
+    
+    Returns:
+        float: Net change in total controversy (negative = reduction, positive = increase)
+    """
+    # Get items involved in the swap
+    item1 = items_dict.get(comp_to_swap.item1_id)
+    item2 = items_dict.get(comp_to_swap.item2_id)
+    
+    if not item1 or not item2:
+        return 0.0
+    
+    # Determine which item is losing (has lower score) but was voted as better
+    # and which item is winning (has higher score) but was voted as worse
+    score1 = item1.points
+    score2 = item2.points
+    
+    # Create temporary score dictionaries to simulate the swap
+    temp_scores = {item_id: item.points for item_id, item in items_dict.items()}
+    
+    # Apply the swap: adjust scores by +2/-2
+    # The item that was losing but voted as better gets +2
+    # The item that was winning but voted as worse gets -2
+    if comp_to_swap.result == 'item1':
+        # item1 was voted as better, but if score2 > score1, item1 was losing
+        if score2 > score1:
+            # item1 gets +2, item2 gets -2
+            temp_scores[item1.id] += 2
+            temp_scores[item2.id] -= 2
+        else:
+            # This shouldn't be controversial, but handle it
+            return 0.0
+    elif comp_to_swap.result == 'item2':
+        # item2 was voted as better, but if score1 > score2, item2 was losing
+        if score1 > score2:
+            # item2 gets +2, item1 gets -2
+            temp_scores[item2.id] += 2
+            temp_scores[item1.id] -= 2
+        else:
+            # This shouldn't be controversial, but handle it
+            return 0.0
+    elif comp_to_swap.result == 'tie':
+        # For ties, if scores differ, we need to determine which should win
+        if score1 > score2:
+            # item1 has higher score, so item2 should get +2, item1 should get -2
+            temp_scores[item2.id] += 2
+            temp_scores[item1.id] -= 2
+        elif score2 > score1:
+            # item2 has higher score, so item1 should get +2, item2 should get -2
+            temp_scores[item1.id] += 2
+            temp_scores[item2.id] -= 2
+        else:
+            # Scores are equal, no change needed
+            return 0.0
+    
+    # Recalculate controversial votes with new scores
+    # Note: The swapped vote's result is effectively reversed, so we need to use the new result
+    new_controversial_votes = []
+    
+    for comp in comparisons:
+        comp_item1 = items_dict.get(comp.item1_id)
+        comp_item2 = items_dict.get(comp.item2_id)
+        
+        if not comp_item1 or not comp_item2:
+            continue
+        
+        # Use temporary scores
+        comp_score1 = temp_scores[comp_item1.id]
+        comp_score2 = temp_scores[comp_item2.id]
+        comp_score_diff = abs(comp_score1 - comp_score2)
+        
+        # Determine the comparison result to use
+        # If this is the vote being swapped, use the swapped result
+        if comp.id == comp_to_swap.id:
+            # Determine swapped result
+            if comp_to_swap.result == 'item1':
+                swapped_result = 'item2'
+            elif comp_to_swap.result == 'item2':
+                swapped_result = 'item1'
+            else:  # tie
+                # For ties, determine which should win based on new scores
+                if comp_score1 > comp_score2:
+                    swapped_result = 'item1'
+                elif comp_score2 > comp_score1:
+                    swapped_result = 'item2'
+                else:
+                    swapped_result = 'tie'
+            comp_result = swapped_result
+        else:
+            # Use original result for other comparisons
+            if not comp.result:
+                continue
+            comp_result = comp.result
+        
+        is_controversial = False
+        controversy_score = 0
+        
+        if comp_result == 'tie':
+            if comp_score1 != comp_score2:
+                is_controversial = True
+                controversy_score = comp_score_diff ** 2
+        elif comp_result == 'item1':
+            if comp_score2 > comp_score1:
+                is_controversial = True
+                controversy_score = comp_score_diff ** 2
+        elif comp_result == 'item2':
+            if comp_score1 > comp_score2:
+                is_controversial = True
+                controversy_score = comp_score_diff ** 2
+        
+        if is_controversial:
+            new_controversial_votes.append(controversy_score)
+    
+    # Calculate new total controversy
+    new_total_controversy = sum(new_controversial_votes)
+    
+    # Return the net change (negative = reduction, positive = increase)
+    return new_total_controversy - current_total_controversy
+
 @app.route('/api/collections/<int:collection_id>/controversial-votes', methods=['GET'])
 def get_controversial_votes(collection_id):
     """Get controversial votes - votes that are inconsistent with current scores."""
@@ -698,17 +830,17 @@ def get_controversial_votes(collection_id):
             # Tie vote is controversial if scores differ
             if score1 != score2:
                 is_controversial = True
-                controversy_score = score_diff
+                controversy_score = score_diff ** 2  # Squared difference
         elif comp.result == 'item1':
             # item1 won, but controversial if score2 > score1
             if score2 > score1:
                 is_controversial = True
-                controversy_score = score_diff
+                controversy_score = score_diff ** 2  # Squared difference
         elif comp.result == 'item2':
             # item2 won, but controversial if score1 > score2
             if score1 > score2:
                 is_controversial = True
-                controversy_score = score_diff
+                controversy_score = score_diff ** 2  # Squared difference
         
         if is_controversial:
             # Determine vote description
@@ -743,8 +875,20 @@ def get_controversial_votes(collection_id):
     # Get top 20
     top_controversial = controversial_votes[:20]
     
-    # Calculate total controversy (sum of squares)
-    total_controversy = sum(vote['controversy_score'] ** 2 for vote in controversial_votes)
+    # Calculate total controversy (sum of squares - controversy_score is already squared)
+    total_controversy = sum(vote['controversy_score'] for vote in controversial_votes)
+    
+    # Calculate swap impact for each top 20 vote
+    # Build a mapping of comparison_id to Comparison object for quick lookup
+    comp_dict = {comp.id: comp for comp in comparisons}
+    
+    for vote in top_controversial:
+        comp = comp_dict.get(vote['comparison_id'])
+        if comp:
+            swap_impact = calculate_swap_impact(collection, comp, items_dict, comparisons, total_controversy)
+            vote['swap_impact'] = swap_impact
+        else:
+            vote['swap_impact'] = 0.0
     
     return jsonify({
         'total_controversy': total_controversy,

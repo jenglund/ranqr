@@ -68,9 +68,9 @@ def test_controversial_vote_when_inconsistent(client, sample_collection):
         controversial_vote = data['controversial_votes'][0]
         assert controversial_vote['comparison_id'] is not None
         assert controversial_vote['vote_result'] == 'item2'  # C > A
-        assert controversial_vote['controversy_score'] == 4  # |2 - (-2)| = 4
+        assert controversial_vote['controversy_score'] == 16  # (|2 - (-2)|)^2 = 4^2 = 16
         assert controversial_vote['score_difference'] == 4
-        assert data['total_controversy'] == 16.0  # 4^2 = 16
+        assert data['total_controversy'] == 16.0  # 16 (controversy_score is already squared)
 
 def test_controversial_tie_vote(client, sample_collection):
     """Test that a tie vote is controversial when scores differ."""
@@ -104,8 +104,8 @@ def test_controversial_tie_vote(client, sample_collection):
         
         controversial_vote = data['controversial_votes'][0]
         assert controversial_vote['vote_result'] == 'tie'
-        assert controversial_vote['controversy_score'] == 4  # |2 - (-2)| = 4
-        assert data['total_controversy'] == 16.0  # 4^2 = 16
+        assert controversial_vote['controversy_score'] == 16  # (|2 - (-2)|)^2 = 4^2 = 16
+        assert data['total_controversy'] == 16.0  # 16 (controversy_score is already squared)
 
 def test_multiple_controversial_votes(client, sample_collection):
     """Test multiple controversial votes and their ordering."""
@@ -147,11 +147,11 @@ def test_multiple_controversial_votes(client, sample_collection):
         assert data['total_controversial_count'] == 2
         assert len(data['controversial_votes']) == 2
         
-        # Both should have controversy score of 4
+        # Both should have controversy score of 16 (4^2)
         for vote in data['controversial_votes']:
-            assert vote['controversy_score'] == 4
+            assert vote['controversy_score'] == 16
         
-        # Total controversy should be sum of squares: 4^2 + 4^2 = 32
+        # Total controversy should be sum: 16 + 16 = 32 (controversy_score is already squared)
         assert data['total_controversy'] == 32.0
 
 def test_top_20_limit(client, sample_collection):
@@ -240,9 +240,9 @@ def test_controversy_score_calculation(client, sample_collection):
         assert len(data['controversial_votes']) == 1
         
         controversial_vote = data['controversial_votes'][0]
-        assert controversial_vote['controversy_score'] == 2
+        assert controversial_vote['controversy_score'] == 4  # (|1 - (-1)|)^2 = 2^2 = 4
         assert controversial_vote['score_difference'] == 2
-        # Total controversy = 2^2 = 4
+        # Total controversy = 4 (controversy_score is already squared)
         assert data['total_controversy'] == 4.0
 
 def test_controversial_vote_structure(client, sample_collection):
@@ -278,6 +278,7 @@ def test_controversial_vote_structure(client, sample_collection):
             assert 'vote_description' in vote
             assert 'score_difference' in vote
             assert 'controversy_score' in vote
+            assert 'swap_impact' in vote  # Swap impact should be included
             
             assert 'id' in vote['item1']
             assert 'name' in vote['item1']
@@ -357,7 +358,8 @@ def test_total_controversy_sum_of_squares(client, sample_collection):
         data = response.get_json()
         
         # Calculate expected total controversy
-        expected_total = sum(vote['controversy_score'] ** 2 for vote in data['controversial_votes'])
+        # Since controversy_score is already squared, total_controversy should be sum(controversy_score)
+        expected_total = sum(vote['controversy_score'] for vote in data['controversial_votes'])
         assert abs(data['total_controversy'] - expected_total) < 0.01  # Allow small floating point differences
 
 def test_controversial_vote_after_score_update(client, sample_collection):
