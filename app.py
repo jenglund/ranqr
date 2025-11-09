@@ -665,6 +665,93 @@ def resolve_triangle(collection_id):
     
     return jsonify({'success': True})
 
+@app.route('/api/collections/<int:collection_id>/controversial-votes', methods=['GET'])
+def get_controversial_votes(collection_id):
+    """Get controversial votes - votes that are inconsistent with current scores."""
+    collection = Collection.query.get_or_404(collection_id)
+    
+    # Get all items and comparisons
+    items_dict = {item.id: item for item in collection.items}
+    comparisons = list(collection.comparisons)
+    
+    controversial_votes = []
+    
+    # Check each comparison for controversy
+    for comp in comparisons:
+        if not comp.result:  # Skip comparisons without results
+            continue
+        
+        item1 = items_dict.get(comp.item1_id)
+        item2 = items_dict.get(comp.item2_id)
+        
+        if not item1 or not item2:
+            continue
+        
+        score1 = item1.points
+        score2 = item2.points
+        score_diff = abs(score1 - score2)
+        
+        is_controversial = False
+        controversy_score = 0
+        
+        if comp.result == 'tie':
+            # Tie vote is controversial if scores differ
+            if score1 != score2:
+                is_controversial = True
+                controversy_score = score_diff
+        elif comp.result == 'item1':
+            # item1 won, but controversial if score2 > score1
+            if score2 > score1:
+                is_controversial = True
+                controversy_score = score_diff
+        elif comp.result == 'item2':
+            # item2 won, but controversial if score1 > score2
+            if score1 > score2:
+                is_controversial = True
+                controversy_score = score_diff
+        
+        if is_controversial:
+            # Determine vote description
+            if comp.result == 'tie':
+                vote_description = f"{item1.name} = {item2.name}"
+            elif comp.result == 'item1':
+                vote_description = f"{item1.name} > {item2.name}"
+            else:  # item2
+                vote_description = f"{item2.name} > {item1.name}"
+            
+            controversial_votes.append({
+                'comparison_id': comp.id,
+                'item1': {
+                    'id': item1.id,
+                    'name': item1.name,
+                    'points': score1
+                },
+                'item2': {
+                    'id': item2.id,
+                    'name': item2.name,
+                    'points': score2
+                },
+                'vote_result': comp.result,
+                'vote_description': vote_description,
+                'score_difference': score_diff,
+                'controversy_score': controversy_score
+            })
+    
+    # Sort by controversy score (descending)
+    controversial_votes.sort(key=lambda x: x['controversy_score'], reverse=True)
+    
+    # Get top 20
+    top_controversial = controversial_votes[:20]
+    
+    # Calculate total controversy (sum of squares)
+    total_controversy = sum(vote['controversy_score'] ** 2 for vote in controversial_votes)
+    
+    return jsonify({
+        'total_controversy': total_controversy,
+        'controversial_votes': top_controversial,
+        'total_controversial_count': len(controversial_votes)
+    })
+
 @app.route('/api/collections/<int:collection_id>/matchup', methods=['GET'])
 def get_next_matchup(collection_id):
     collection = Collection.query.get_or_404(collection_id)

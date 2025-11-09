@@ -711,6 +711,7 @@
                     <button onclick="showMatchup()">Make Comparisons</button>
                     <button onclick="showRankings()">View Rankings</button>
                     <button onclick="showFixedTriangles()">Resolve Triangles</button>
+                    <button onclick="showControversialVotes()">Controversial Votes</button>
                 </div>
 
                 <div id="stats" class="stats hidden"></div>
@@ -770,6 +771,13 @@
                 <h3 class="section-title">Resolve Triangles</h3>
                 <div id="triangles-container">
                     <div class="loading">Loading triangles...</div>
+                </div>
+            </div>
+
+            <div id="controversial-votes-section" class="card hidden">
+                <h3 class="section-title">Controversial Votes</h3>
+                <div id="controversial-votes-container">
+                    <div class="loading">Loading controversial votes...</div>
                 </div>
             </div>
         </div>
@@ -968,6 +976,7 @@
             document.getElementById('matchup-section').classList.remove('hidden');
             document.getElementById('rankings-section').classList.add('hidden');
             document.getElementById('fixed-triangles-section').classList.add('hidden');
+            document.getElementById('controversial-votes-section').classList.add('hidden');
             await loadNextMatchup();
         }
 
@@ -975,6 +984,7 @@
             document.getElementById('matchup-section').classList.add('hidden');
             document.getElementById('rankings-section').classList.remove('hidden');
             document.getElementById('fixed-triangles-section').classList.add('hidden');
+            document.getElementById('controversial-votes-section').classList.add('hidden');
             await loadRankings();
         }
 
@@ -982,7 +992,16 @@
             document.getElementById('matchup-section').classList.add('hidden');
             document.getElementById('rankings-section').classList.add('hidden');
             document.getElementById('fixed-triangles-section').classList.remove('hidden');
+            document.getElementById('controversial-votes-section').classList.add('hidden');
             await loadTriangles();
+        }
+
+        async function showControversialVotes() {
+            document.getElementById('matchup-section').classList.add('hidden');
+            document.getElementById('rankings-section').classList.add('hidden');
+            document.getElementById('fixed-triangles-section').classList.add('hidden');
+            document.getElementById('controversial-votes-section').classList.remove('hidden');
+            await loadControversialVotes();
         }
 
         async function loadTriangles() {
@@ -1173,6 +1192,198 @@
             } catch (error) {
                 console.error('Error resolving triangle:', error);
                 alert('Error resolving triangle');
+            }
+        }
+
+        async function loadControversialVotes() {
+            const container = document.getElementById('controversial-votes-container');
+            container.innerHTML = '<div class="loading">Loading controversial votes...</div>';
+            
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}/controversial-votes`);
+                if (!response.ok) {
+                    container.innerHTML = '<div class="loading">Error loading controversial votes</div>';
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                let html = '';
+                
+                // Display total controversy score
+                html += `
+                    <div style="margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px;">
+                        <div style="font-size: 1.2em; margin-bottom: 10px; font-weight: bold;">Total Controversy Score</div>
+                        <div style="font-size: 2.5em; font-weight: bold;">${data.total_controversy.toFixed(2)}</div>
+                        <div style="font-size: 0.9em; opacity: 0.9; margin-top: 5px;">
+                            ${data.total_controversial_count} controversial vote${data.total_controversial_count !== 1 ? 's' : ''} found
+                        </div>
+                    </div>
+                `;
+                
+                if (!data.controversial_votes || data.controversial_votes.length === 0) {
+                    html += '<div class="loading" style="padding: 40px; text-align: center; color: #666;">There are no controversial votes. All votes are consistent with the current scores!</div>';
+                    container.innerHTML = html;
+                    return;
+                }
+                
+                html += '<div style="display: flex; flex-direction: column; gap: 20px;">';
+                
+                for (const vote of data.controversial_votes) {
+                    const item1 = vote.item1;
+                    const item2 = vote.item2;
+                    const score1 = item1.points;
+                    const score2 = item2.points;
+                    const scoreDiff = vote.score_difference;
+                    const controversyScore = vote.controversy_score;
+                    
+                    // Determine which item has higher score
+                    const higherItem = score1 > score2 ? item1 : item2;
+                    const lowerItem = score1 > score2 ? item2 : item1;
+                    const higherScore = Math.max(score1, score2);
+                    const lowerScore = Math.min(score1, score2);
+                    
+                    html += `
+                        <div style="border: 2px solid #dc3545; border-radius: 8px; padding: 20px; background: #fff5f5;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; flex-wrap: wrap; gap: 15px;">
+                                <div style="flex: 1; min-width: 300px;">
+                                    <div style="font-size: 1.1em; font-weight: bold; color: #dc3545; margin-bottom: 10px;">
+                                        Controversy Score: ${controversyScore.toFixed(2)}
+                                    </div>
+                                    <div style="margin-bottom: 8px;">
+                                        <strong>Vote:</strong> ${escapeHtml(vote.vote_description)}
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                                        <div>
+                                            <strong>${escapeHtml(item1.name)}</strong>: ${score1 > 0 ? '+' : ''}${score1} points
+                                        </div>
+                                        <div>
+                                            <strong>${escapeHtml(item2.name)}</strong>: ${score2 > 0 ? '+' : ''}${score2} points
+                                        </div>
+                                        <div style="color: #dc3545; font-weight: bold;">
+                                            Score Difference: ${scoreDiff} (${escapeHtml(higherItem.name)} has higher score)
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center;">
+                                    <button onclick="swapControversialVote(${vote.comparison_id}, ${item1.id}, ${item2.id}, '${vote.vote_result}')" 
+                                            style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000;">
+                                        🔄 Swap Vote
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading controversial votes:', error);
+                container.innerHTML = '<div class="loading">Error loading controversial votes</div>';
+            }
+        }
+
+        async function swapControversialVote(comparisonId, item1Id, item2Id, currentResult) {
+            // Get collection data once
+            let collection, items_dict, item1, item2;
+            try {
+                const collectionResponse = await fetch(`/api/collections/${currentCollectionId}`);
+                collection = await collectionResponse.json();
+                items_dict = {};
+                collection.items.forEach(item => {
+                    items_dict[item.id] = item;
+                });
+                
+                item1 = items_dict[item1Id];
+                item2 = items_dict[item2Id];
+                
+                if (!item1 || !item2) {
+                    alert('Error: Items not found');
+                    return;
+                }
+            } catch (error) {
+                console.error('Error fetching collection:', error);
+                alert('Error loading collection data');
+                return;
+            }
+            
+            // Determine the new result (swap the vote)
+            let newResult;
+            if (currentResult === 'item1') {
+                newResult = 'item2';
+            } else if (currentResult === 'item2') {
+                newResult = 'item1';
+            } else {
+                // For ties, determine which item should win based on scores
+                // If scores are equal, default to item1
+                if (item1.points >= item2.points) {
+                    newResult = 'item1';
+                } else {
+                    newResult = 'item2';
+                }
+            }
+            
+            let currentVoteDesc;
+            if (currentResult === 'item1') {
+                currentVoteDesc = `"${item1.name}" > "${item2.name}"`;
+            } else if (currentResult === 'item2') {
+                currentVoteDesc = `"${item2.name}" > "${item1.name}"`;
+            } else {
+                currentVoteDesc = `"${item1.name}" = "${item2.name}"`;
+            }
+            
+            let newVoteDesc;
+            if (newResult === 'item1') {
+                newVoteDesc = `"${item1.name}" > "${item2.name}"`;
+            } else if (newResult === 'item2') {
+                newVoteDesc = `"${item2.name}" > "${item1.name}"`;
+            } else {
+                newVoteDesc = `"${item1.name}" = "${item2.name}"`;
+            }
+            
+            const confirmMessage = `Swap this vote?\n\nCurrent: ${currentVoteDesc}\nNew: ${newVoteDesc}\n\nClick OK to swap, or Cancel to keep current vote.`;
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            // Ensure consistent ordering (smaller ID first)
+            const item1_id = Math.min(item1Id, item2Id);
+            const item2_id = Math.max(item1Id, item2Id);
+            
+            // Adjust result if IDs were swapped
+            let adjustedResult = newResult;
+            if (item1Id > item2Id) {
+                if (newResult === 'item1') {
+                    adjustedResult = 'item2';
+                } else if (newResult === 'item2') {
+                    adjustedResult = 'item1';
+                }
+            }
+            
+            try {
+                const response = await fetch(`/api/collections/${currentCollectionId}/matchup`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        item1_id: item1_id,
+                        item2_id: item2_id,
+                        winner: adjustedResult
+                    })
+                });
+                
+                if (response.ok) {
+                    // Reload controversial votes and rankings
+                    await loadControversialVotes();
+                    await loadRankings();
+                } else {
+                    const error = await response.json();
+                    alert(`Error swapping vote: ${error.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error swapping vote:', error);
+                alert('Error swapping vote');
             }
         }
 
