@@ -1195,6 +1195,56 @@
             }
         }
 
+        function formatContradictingAndSupportingItems(vote) {
+            const contradicting = vote.contradicting_items || [];
+            const supporting = vote.supporting_items || [];
+            
+            if (contradicting.length === 0 && supporting.length === 0) {
+                return '';
+            }
+            
+            let html = '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">';
+            
+            if (contradicting.length > 0) {
+                html += '<div style="margin-bottom: 15px;">';
+                html += '<div style="font-weight: bold; color: #dc3545; margin-bottom: 8px;">';
+                html += `🔴 Contradicting Items (${contradicting.length}):`;
+                html += '</div>';
+                html += '<div style="display: flex; flex-wrap: wrap; gap: 8px;">';
+                for (const item of contradicting) {
+                    html += `<span style="padding: 4px 8px; background: #ffe6e6; border-radius: 4px; border: 1px solid #dc3545; font-size: 0.9em;">`;
+                    html += `${escapeHtml(item.name)} (${item.points > 0 ? '+' : ''}${item.points})`;
+                    html += `</span>`;
+                }
+                html += '</div>';
+                html += '<div style="font-size: 0.85em; color: #666; margin-top: 4px;">';
+                html += 'These items create contradictions: B > C and C > A';
+                html += '</div>';
+                html += '</div>';
+            }
+            
+            if (supporting.length > 0) {
+                html += '<div>';
+                html += '<div style="font-weight: bold; color: #28a745; margin-bottom: 8px;">';
+                html += `🟢 Supporting Items (${supporting.length}):`;
+                html += '</div>';
+                html += '<div style="display: flex; flex-wrap: wrap; gap: 8px;">';
+                for (const item of supporting) {
+                    html += `<span style="padding: 4px 8px; background: #e6ffe6; border-radius: 4px; border: 1px solid #28a745; font-size: 0.9em;">`;
+                    html += `${escapeHtml(item.name)} (${item.points > 0 ? '+' : ''}${item.points})`;
+                    html += `</span>`;
+                }
+                html += '</div>';
+                html += '<div style="font-size: 0.85em; color: #666; margin-top: 4px;">';
+                html += 'These items reinforce the ordering: A > C and C > B';
+                html += '</div>';
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
         async function loadControversialVotes() {
             const container = document.getElementById('controversial-votes-container');
             container.innerHTML = '<div class="loading">Loading controversial votes...</div>';
@@ -1290,6 +1340,7 @@
                                     </button>
                                 </div>
                             </div>
+                            ${formatContradictingAndSupportingItems(vote)}
                         </div>
                     `;
                 }
