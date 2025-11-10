@@ -116,14 +116,15 @@
             flex-direction: column;
             gap: 20px;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             min-height: 200px;
+            margin-top: 20px; /* Ensure consistent spacing from header */
         }
         
         .matchup-items-row {
             display: flex;
             gap: 20px;
-            align-items: center;
+            align-items: stretch; /* Ensure items have same height and don't shift */
             justify-content: center;
             width: 100%;
         }
@@ -775,6 +776,7 @@
         #matchup-modal-content .matchup-container {
             flex: 1;
             min-height: 0;
+            margin-top: 20px; /* Ensure consistent spacing from header in modal */
         }
 
         /* Optimize for iPad landscape */
