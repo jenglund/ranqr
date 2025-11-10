@@ -1535,7 +1535,7 @@
                         <button onclick="submitSelectedVote()" id="submit-vote-btn" disabled class="submit-vote-btn-inactive" style="padding: 12px 32px; font-size: 1.1em;">Submit</button>
                     </div>
                     <div style="width: 100%; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;">
-                        <button onclick="revealScores()" style="padding: 10px 20px; font-size: 0.95em; background: #6c757d; color: white;">📊 Reveal Scores</button>
+                        <button id="reveal-scores-btn" onclick="revealScores()" style="padding: 10px 20px; font-size: 0.95em; background: #6c757d; color: white;">📊 Reveal Scores</button>
                         ${window.lastVote ? `
                         <button onclick="changeLastVote()" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px;">↩️ Revise Last Vote</button>
                         ` : ''}
@@ -1866,6 +1866,12 @@
                 
                 if (score2Container) {
                     score2Container.innerHTML = `<div style="font-weight: bold; color: #333;">${escapeHtml(score2Display)} pts</div>`;
+                }
+                
+                // Hide the Reveal Scores button after scores are shown
+                const revealBtn = document.getElementById('reveal-scores-btn');
+                if (revealBtn) {
+                    revealBtn.style.display = 'none';
                 }
             } catch (error) {
                 console.error('Error revealing scores:', error);
