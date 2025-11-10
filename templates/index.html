@@ -1730,11 +1730,11 @@
             const item1NameEl = document.getElementById('item1-name');
             const item2NameEl = document.getElementById('item2-name');
             if (item1NameEl) {
-                item1NameEl.textContent = escapeHtml(data.item1.name);
+                item1NameEl.textContent = data.item1.name;
                 item1NameEl.style.color = '#333';
             }
             if (item2NameEl) {
-                item2NameEl.textContent = escapeHtml(data.item2.name);
+                item2NameEl.textContent = data.item2.name;
                 item2NameEl.style.color = '#333';
             }
 
@@ -1792,7 +1792,11 @@
                         <button type="button" onclick="changeLastVote()" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px;">↩️ Revise Last Vote</button>
                     `;
                 } else {
-                    reviseVoteSection.innerHTML = '';
+                    // Placeholder to maintain layout spacing when there's no last vote
+                    // Use a button element with same styling but hidden to maintain exact dimensions
+                    reviseVoteSection.innerHTML = `
+                        <button type="button" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px; visibility: hidden; pointer-events: none;">↩️ Revise Last Vote</button>
+                    `;
                 }
             }
         }
