@@ -36,13 +36,27 @@ check_branch() {
 }
 
 # Function to pull latest changes
+# Returns 0 if updates were pulled, 1 if no updates or error
 pull_latest() {
+    # Store current HEAD before pulling
+    local_before=$(git rev-parse HEAD 2>/dev/null)
+    
     info "Pulling latest changes from origin/main..."
     if ! git pull origin main; then
         error "Failed to pull latest changes. Continuing with current code..."
         return 1
     fi
-    return 0
+    
+    # Check if HEAD changed (meaning updates were pulled)
+    local_after=$(git rev-parse HEAD 2>/dev/null)
+    if [ "$local_before" != "$local_after" ]; then
+        info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        info "✓ GIT PULL UPDATE: Changes pulled successfully (${local_before:0:7} → ${local_after:0:7})"
+        info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        return 0
+    else
+        return 2  # No updates (different from error)
+    fi
 }
 
 # Function to start the server
@@ -91,8 +105,12 @@ main() {
     check_branch
     
     # Initial pull to ensure we're up to date
-    if ! pull_latest; then
+    pull_latest
+    pull_result=$?
+    if [ "$pull_result" = "1" ]; then
         warn "Initial pull failed, but continuing with current code..."
+    elif [ "$pull_result" = "0" ]; then
+        info "Initial update pulled successfully"
     fi
     
     # Step 2: Start server initially
@@ -111,15 +129,25 @@ main() {
             stop_server
             
             info "Pulling latest changes..."
-            if pull_latest; then
-                info "Restarting server with updated code..."
+            pull_latest
+            pull_result=$?
+            if [ "$pull_result" = "0" ]; then
+                # Updates were pulled
+                info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                info "🔄 SERVER RESTART: Restarting server after git pull update..."
+                start_server
+                info "✓ SERVER RESTART: Server restarted successfully after update"
+                info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                info "Continuing to monitor for updates..."
+            elif [ "$pull_result" = "2" ]; then
+                # No updates (shouldn't happen if check_for_updates worked, but handle it)
+                warn "No updates found after pull. Restarting server with current code..."
                 start_server
             else
+                # Pull failed
                 warn "Pull failed. Restarting server with current code..."
                 start_server
             fi
-            
-            info "Server restarted with latest changes. Continuing to monitor..."
         else
             # Silent check - no updates
             :
