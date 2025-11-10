@@ -797,6 +797,84 @@ def calculate_swap_impact(collection, comp_to_swap, items_dict, comparisons, cur
     # Return the net change (negative = reduction, positive = increase)
     return new_total_controversy - current_total_controversy
 
+def find_contradicting_and_supporting_items(item_a_id, item_b_id, items_dict, comparisons):
+    """
+    Find contradicting and supporting items for a vote "A is better than B".
+    
+    A contradicting item C satisfies: B > C AND C > A (both votes exist)
+    A supporting item C satisfies: A > C AND C > B (both votes exist)
+    
+    Args:
+        item_a_id: ID of item A (the winner in the vote)
+        item_b_id: ID of item B (the loser in the vote)
+        items_dict: Dictionary mapping item_id to Item object
+        comparisons: List of all Comparison objects
+    
+    Returns:
+        Tuple of (contradicting_items, supporting_items) where each is a list of dicts
+        with keys: id, name, points
+    """
+    # Build comparison lookup: (min_id, max_id) -> Comparison object
+    comp_lookup = {}
+    for comp in comparisons:
+        if comp.result:  # Only consider non-null results
+            key = (min(comp.item1_id, comp.item2_id), max(comp.item1_id, comp.item2_id))
+            comp_lookup[key] = comp
+    
+    def does_item_win(item_x_id, item_y_id):
+        """
+        Check if item_x beats item_y (item_x > item_y).
+        Returns True if item_x wins, False if item_y wins or tie, None if no comparison exists.
+        """
+        key = (min(item_x_id, item_y_id), max(item_x_id, item_y_id))
+        comp = comp_lookup.get(key)
+        if not comp or not comp.result:
+            return None
+        
+        # Determine which item won based on the comparison result
+        if comp.result == 'tie':
+            return False
+        elif comp.result == 'item1':
+            # item1_id won
+            return comp.item1_id == item_x_id
+        else:  # item2
+            # item2_id won
+            return comp.item2_id == item_x_id
+    
+    contradicting_items = []
+    supporting_items = []
+    
+    # Check all items C (excluding A and B)
+    for item_c_id, item_c in items_dict.items():
+        if item_c_id == item_a_id or item_c_id == item_b_id:
+            continue
+        
+        # Check for contradicting item: B > C AND C > A
+        bc_result = does_item_win(item_b_id, item_c_id)
+        ca_result = does_item_win(item_c_id, item_a_id)
+        
+        if bc_result is True and ca_result is True:
+            # B beats C AND C beats A - this contradicts A > B
+            contradicting_items.append({
+                'id': item_c.id,
+                'name': item_c.name,
+                'points': item_c.points
+            })
+        
+        # Check for supporting item: A > C AND C > B
+        ac_result = does_item_win(item_a_id, item_c_id)
+        cb_result = does_item_win(item_c_id, item_b_id)
+        
+        if ac_result is True and cb_result is True:
+            # A beats C AND C beats B - this supports A > B
+            supporting_items.append({
+                'id': item_c.id,
+                'name': item_c.name,
+                'points': item_c.points
+            })
+    
+    return contradicting_items, supporting_items
+
 @app.route('/api/collections/<int:collection_id>/controversial-votes', methods=['GET'])
 def get_controversial_votes(collection_id):
     """Get controversial votes - votes that are inconsistent with current scores."""
@@ -889,6 +967,26 @@ def get_controversial_votes(collection_id):
             vote['swap_impact'] = swap_impact
         else:
             vote['swap_impact'] = 0.0
+        
+        # Find contradicting and supporting items (only for non-tie votes)
+        if vote['vote_result'] != 'tie':
+            # Determine which item is the winner (A) and which is the loser (B)
+            if vote['vote_result'] == 'item1':
+                item_a_id = vote['item1']['id']
+                item_b_id = vote['item2']['id']
+            else:  # item2
+                item_a_id = vote['item2']['id']
+                item_b_id = vote['item1']['id']
+            
+            contradicting_items, supporting_items = find_contradicting_and_supporting_items(
+                item_a_id, item_b_id, items_dict, comparisons
+            )
+            vote['contradicting_items'] = contradicting_items
+            vote['supporting_items'] = supporting_items
+        else:
+            # For tie votes, we can't determine contradicting/supporting items
+            vote['contradicting_items'] = []
+            vote['supporting_items'] = []
     
     return jsonify({
         'total_controversy': total_controversy,
