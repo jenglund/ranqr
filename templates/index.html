@@ -17,11 +17,14 @@
             min-height: 100vh;
             padding: 20px;
             color: #333;
+            margin: 0;
+            padding-bottom: 0;
         }
 
         .container {
             max-width: 1200px;
             margin: 0 auto;
+            padding-bottom: 20px;
         }
 
         h1 {
@@ -718,6 +721,102 @@
         .histogram-row.level-4 .histogram-bar {
             background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
         }
+
+        /* Full-screen matchup modal overlay */
+        #matchup-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        #matchup-modal-overlay.hidden {
+            display: none;
+        }
+
+        #matchup-modal-content {
+            width: 100%;
+            max-width: 1400px;
+            max-height: 100vh;
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            /* Prevent scrolling on touch devices when content fits */
+            overscroll-behavior: contain;
+        }
+
+        /* Prevent body scroll when modal is open */
+        body.matchup-modal-open {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Close button for matchup modal */
+        .matchup-close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 1.5em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: all 0.2s;
+        }
+
+        .matchup-close-btn:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+
+        /* Ensure matchup container fits well in modal */
+        #matchup-modal-content .matchup-container {
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* Optimize for iPad landscape */
+        @media (min-width: 1024px) and (orientation: landscape) {
+            #matchup-modal-content {
+                max-height: 95vh;
+                padding: 30px;
+            }
+            
+            /* Try to fit everything without scrolling on iPad landscape */
+            #matchup-modal-content .matchup-container {
+                max-height: calc(95vh - 150px);
+            }
+        }
+        
+        /* On smaller screens, allow scrolling within modal */
+        @media (max-height: 800px) {
+            #matchup-modal-content {
+                max-height: 98vh;
+            }
+        }
     </style>
 </head>
 <body>
@@ -751,8 +850,8 @@
                     <textarea id="items-input" placeholder="Enter items, one per line..."></textarea>
                 </div>
                 <div style="display: flex; gap: 10px;">
-                    <button onclick="createCollection()">Create Collection</button>
-                    <button class="secondary" onclick="hideCreateDialog()">Cancel</button>
+                    <button type="button" onclick="createCollection()">Create Collection</button>
+                    <button type="button" class="secondary" onclick="hideCreateDialog()">Cancel</button>
                 </div>
             </div>
         </div>
@@ -761,20 +860,36 @@
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2 class="section-title" style="margin: 0;" id="collection-title"></h2>
-                    <button class="secondary" onclick="showCollections()">← Back to Collections</button>
+                    <button type="button" class="secondary" onclick="showCollections()">← Back to Collections</button>
                 </div>
                 
                 <div class="view-controls">
-                    <button onclick="showMatchup()">Make Comparisons</button>
-                    <button onclick="showRankings()">View Rankings</button>
-                    <button onclick="showFixedTriangles()">Resolve Triangles</button>
-                    <button onclick="showControversialVotes()">Controversial Votes</button>
+                    <button type="button" onclick="showMatchup()">Make Comparisons</button>
+                    <button type="button" onclick="showRankings()">View Rankings</button>
+                    <button type="button" onclick="showFixedTriangles()">Resolve Triangles</button>
+                    <button type="button" onclick="showControversialVotes()">Controversial Votes</button>
                 </div>
 
                 <div id="stats" class="stats hidden"></div>
             </div>
 
-            <div id="matchup-section" class="card hidden">
+            <!-- Matchup Modal Overlay (full-screen) -->
+            <div id="matchup-modal-overlay" class="hidden">
+                <div id="matchup-modal-content">
+                    <button class="matchup-close-btn" onclick="exitMatchup()" type="button" title="Exit to Rankings">✕</button>
+                    <h3 class="section-title" id="pairwise-comparison-header" style="margin-top: 0;">Pairwise Comparison</h3>
+                    <div id="matchup-container" class="matchup-container">
+                        <div class="loading">Loading next matchup...</div>
+                    </div>
+                    <div id="matchup-edit-section" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
+                        <h4 style="margin-bottom: 15px; color: #667eea;">Edit Items</h4>
+                        <div id="matchup-edit-items" style="display: flex; flex-direction: column; gap: 15px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Keep old matchup-section for backwards compatibility but hide it -->
+            <div id="matchup-section" class="card hidden" style="display: none !important;">
                 <h3 class="section-title" id="pairwise-comparison-header">Pairwise Comparison</h3>
                 <div id="matchup-container" class="matchup-container">
                     <div class="loading">Loading next matchup...</div>
@@ -788,7 +903,7 @@
             <div id="rankings-section" class="card hidden">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 class="section-title" style="margin: 0;">Current Rankings</h3>
-                    <button onclick="editCollectionSearchPrefix()" style="padding: 6px 12px; font-size: 0.9em;">⚙️ Edit Search Prefix</button>
+                    <button type="button" onclick="editCollectionSearchPrefix()" style="padding: 6px 12px; font-size: 0.9em;">⚙️ Edit Search Prefix</button>
                 </div>
                 
                 <div id="collection-search-prefix-display" style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
@@ -818,7 +933,7 @@
                         <label for="new-items-input">Items (one per line):</label>
                         <textarea id="new-items-input" placeholder="Enter new items, one per line..."></textarea>
                     </div>
-                    <button onclick="addItemsToCollection()">Add Items</button>
+                    <button type="button" onclick="addItemsToCollection()">Add Items</button>
                 </div>
 
                 <ul id="rankings-list" class="rankings-list"></ul>
@@ -859,7 +974,7 @@
             <div class="card" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 class="section-title" style="margin: 0;" id="votes-item-name"></h3>
-                    <button class="secondary" onclick="hideVotesDialog()">✕ Close</button>
+                    <button type="button" class="secondary" onclick="hideVotesDialog()">✕ Close</button>
                 </div>
                 
                 <div style="margin-bottom: 20px;">
@@ -884,7 +999,7 @@
                 </div>
                 
                 <div style="margin-bottom: 15px;">
-                    <button class="danger" onclick="resetItemVotes()" id="reset-votes-btn">🔄 Reset All Votes</button>
+                    <button type="button" class="danger" onclick="resetItemVotes()" id="reset-votes-btn">🔄 Reset All Votes</button>
                 </div>
                 
                 <div id="votes-wins-section" style="margin-bottom: 20px;">
@@ -938,8 +1053,8 @@
                         <h3>${escapeHtml(collection.name)}</h3>
                         <div class="meta">${collection.item_count} items</div>
                         <div class="actions">
-                            <button onclick="openCollection(${collection.id})">Open</button>
-                            <button class="danger" onclick="deleteCollection(${collection.id})">Delete</button>
+                            <button type="button" onclick="openCollection(${collection.id})">Open</button>
+                            <button type="button" class="danger" onclick="deleteCollection(${collection.id})">Delete</button>
                         </div>
                     `;
                     listEl.appendChild(card);
@@ -1048,16 +1163,36 @@
 
         async function showMatchup() {
             resetActivityState();
-            document.getElementById('matchup-section').classList.remove('hidden');
+            // Show modal overlay
+            const modalOverlay = document.getElementById('matchup-modal-overlay');
+            modalOverlay.classList.remove('hidden');
+            // Prevent body scrolling
+            document.body.classList.add('matchup-modal-open');
+            // Hide other sections
             document.getElementById('rankings-section').classList.add('hidden');
             document.getElementById('fixed-triangles-section').classList.add('hidden');
             document.getElementById('controversial-votes-section').classList.add('hidden');
             await loadNextMatchup();
         }
 
+        function exitMatchup() {
+            // Hide modal overlay
+            const modalOverlay = document.getElementById('matchup-modal-overlay');
+            modalOverlay.classList.add('hidden');
+            // Re-enable body scrolling
+            document.body.classList.remove('matchup-modal-open');
+            // Show rankings
+            showRankings();
+        }
+
         async function showRankings() {
             resetActivityState();
-            document.getElementById('matchup-section').classList.add('hidden');
+            // Ensure matchup modal is hidden
+            const modalOverlay = document.getElementById('matchup-modal-overlay');
+            if (modalOverlay) {
+                modalOverlay.classList.add('hidden');
+            }
+            document.body.classList.remove('matchup-modal-open');
             document.getElementById('rankings-section').classList.remove('hidden');
             document.getElementById('fixed-triangles-section').classList.add('hidden');
             document.getElementById('controversial-votes-section').classList.add('hidden');
@@ -1066,7 +1201,12 @@
 
         async function showFixedTriangles() {
             resetActivityState();
-            document.getElementById('matchup-section').classList.add('hidden');
+            // Ensure matchup modal is hidden
+            const modalOverlay = document.getElementById('matchup-modal-overlay');
+            if (modalOverlay) {
+                modalOverlay.classList.add('hidden');
+            }
+            document.body.classList.remove('matchup-modal-open');
             document.getElementById('rankings-section').classList.add('hidden');
             document.getElementById('fixed-triangles-section').classList.remove('hidden');
             document.getElementById('controversial-votes-section').classList.add('hidden');
@@ -1075,6 +1215,12 @@
 
         async function showControversialVotes() {
             resetActivityState();
+            // Ensure matchup modal is hidden
+            const modalOverlay = document.getElementById('matchup-modal-overlay');
+            if (modalOverlay) {
+                modalOverlay.classList.add('hidden');
+            }
+            document.body.classList.remove('matchup-modal-open');
             document.getElementById('matchup-section').classList.add('hidden');
             document.getElementById('rankings-section').classList.add('hidden');
             document.getElementById('fixed-triangles-section').classList.add('hidden');
@@ -1155,7 +1301,7 @@
                         <div class="card" style="max-width: 800px; max-height: 90vh; overflow-y: auto; margin: 20px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                                 <h3 class="section-title" style="margin: 0;">Resolution Options</h3>
-                                <button onclick="closeTriangleOptionsDialog()" style="background: none; border: none; font-size: 1.5em; cursor: pointer; color: #666;">×</button>
+                                <button type="button" onclick="closeTriangleOptionsDialog()" style="background: none; border: none; font-size: 1.5em; cursor: pointer; color: #666;">×</button>
                             </div>
                             <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
                                 <strong>Triangle:</strong> ${escapeHtml(item_a_name)}, ${escapeHtml(item_b_name)}, ${escapeHtml(item_c_name)}
@@ -1194,7 +1340,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <button onclick="resolveTriangle(${item_a_id}, ${item_b_id}, ${item_c_id}, ${i})" 
+                            <button type="button" onclick="resolveTriangle(${item_a_id}, ${item_b_id}, ${item_c_id}, ${i})" 
                                     style="width: 100%; padding: 10px; font-size: 0.95em; ${dissonanceChange < 0 ? 'background: #28a745;' : ''}">
                                 Select This Resolution
                             </button>
@@ -1553,20 +1699,10 @@
             }
         }
 
-        async function loadNextMatchup(specificItem1Id = null, specificItem2Id = null, scrollReferenceElement = null, scrollReferenceOffset = null) {
-            const container = document.getElementById('matchup-container');
-            
-            // Store scroll position before updating DOM if we have a reference
-            let scrollRestoreInfo = null;
-            if (scrollReferenceElement && scrollReferenceOffset !== null) {
-                const containerRect = container.getBoundingClientRect();
-                const containerTop = containerRect.top + window.scrollY;
-                scrollRestoreInfo = {
-                    referenceOffset: scrollReferenceOffset,
-                    containerTopBefore: containerTop,
-                    scrollYBefore: window.scrollY
-                };
-            }
+        async function loadNextMatchup(specificItem1Id = null, specificItem2Id = null) {
+            // Use the matchup container from the modal overlay
+            const modalContent = document.getElementById('matchup-modal-content');
+            const container = modalContent ? modalContent.querySelector('#matchup-container') : document.getElementById('matchup-container');
             
             container.innerHTML = '<div class="loading">Loading next matchup...</div>';
             
@@ -1609,13 +1745,13 @@
                             </div>
                             <div class="item-fade-overlay" id="item1-fade-overlay"></div>
                         </div>
-                        <button class="matchup-vs-btn" id="tie-button" onclick="selectVote('tie')">?</button>
+                        <button type="button" class="matchup-vs-btn" id="tie-button" onclick="selectVote('tie')">?</button>
                         <div class="matchup-item clickable-item" id="item2-container" data-item="item2">
                             <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
                                 <div class="item-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
                                     <a href="${escapeHtml(searchUrl2)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
-                                    <button onclick="autoFillYouTube(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
-                                    <button onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                                    <button type="button" onclick="autoFillYouTube(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
+                                    <button type="button" onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
                                 </div>
                                 <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item2.name)}</div>
                                 <div id="item2-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
@@ -1625,12 +1761,12 @@
                         </div>
                     </div>
                     <div id="submit-vote-section" style="margin-top: 20px; text-align: center;">
-                        <button onclick="submitSelectedVote()" id="submit-vote-btn" disabled class="submit-vote-btn-inactive" style="padding: 12px 32px; font-size: 1.1em; display: none;">Submit</button>
-                        <button id="reveal-scores-btn" onclick="revealScores()" style="padding: 12px 32px; font-size: 1.1em; background: #6c757d; color: white; display: none;">📊 Reveal Scores</button>
+                        <button type="button" onclick="submitSelectedVote()" id="submit-vote-btn" disabled class="submit-vote-btn-inactive" style="padding: 12px 32px; font-size: 1.1em; display: none;">Submit</button>
+                        <button type="button" id="reveal-scores-btn" onclick="revealScores()" style="padding: 12px 32px; font-size: 1.1em; background: #6c757d; color: white; display: none;">📊 Reveal Scores</button>
                     </div>
                     <div style="width: 100%; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;">
                         ${window.lastVote ? `
-                        <button onclick="changeLastVote()" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px;">↩️ Revise Last Vote</button>
+                        <button type="button" onclick="changeLastVote()" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px;">↩️ Revise Last Vote</button>
                         ` : ''}
                     </div>
                 `;
@@ -1715,60 +1851,6 @@
                 
                 // Update center button and submit button state
                 updateVoteButtonStates();
-                
-                // Restore scroll position if we have scroll restore info (from async vote submission)
-                if (scrollRestoreInfo) {
-                    // Use requestAnimationFrame to ensure DOM is fully rendered before restoring scroll
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            const newContainerRect = container.getBoundingClientRect();
-                            const newContainerTop = newContainerRect.top + window.scrollY;
-                            
-                            // Calculate how much the container moved
-                            const containerTopDelta = newContainerTop - scrollRestoreInfo.containerTopBefore;
-                            
-                            // Restore scroll position relative to the reference point
-                            // The goal is to keep the same element at the same position in the viewport
-                            const targetScrollY = scrollRestoreInfo.scrollYBefore + containerTopDelta;
-                            
-                            window.scrollTo({
-                                top: targetScrollY,
-                                behavior: 'instant' // Use instant to avoid animation that might feel jarring
-                            });
-                        });
-                    });
-                } else if (window.lastVote) {
-                    // Fallback: Scroll to comparison container if we're loading after a previous vote
-                    // (but only if we don't have scroll restore info)
-                    setTimeout(() => {
-                        const matchupSection = document.getElementById('matchup-section');
-                        const header = document.getElementById('pairwise-comparison-header');
-                        
-                        if (matchupSection && header) {
-                            const viewportHeight = window.innerHeight;
-                            const sectionRect = matchupSection.getBoundingClientRect();
-                            const sectionHeight = sectionRect.height;
-                            
-                            if (sectionHeight < viewportHeight) {
-                                // Container is smaller than viewport: scroll so bottom of container is at bottom of viewport
-                                const sectionBottomAbsolute = sectionRect.bottom + window.scrollY;
-                                const targetScrollPosition = sectionBottomAbsolute - viewportHeight;
-                                window.scrollTo({
-                                    top: targetScrollPosition,
-                                    behavior: 'smooth'
-                                });
-                            } else {
-                                // Container is larger than viewport: scroll so top of container (header) is at top of viewport
-                                header.scrollIntoView({
-                                    behavior: 'smooth',
-                                    block: 'start'
-                                });
-                            }
-                        }
-                    }, 100);
-                }
-                
-                // Keep last vote info - don't clear it, just update it when we vote
             } catch (error) {
                 console.error('Error loading matchup:', error);
                 container.innerHTML = '<div class="loading">Error loading matchup</div>';
@@ -1933,19 +2015,7 @@
                 winner: result
             };
             
-            // Store current scroll position and viewport reference point before making changes
-            const scrollPositionBefore = window.scrollY;
-            const matchupSection = document.getElementById('matchup-section');
-            const matchupContainer = document.getElementById('matchup-container');
-            let referenceElement = null;
-            let referenceOffset = 0;
-            
-            if (matchupSection && matchupContainer) {
-                // Use the matchup container as a reference point
-                const containerRect = matchupContainer.getBoundingClientRect();
-                referenceElement = matchupContainer;
-                referenceOffset = containerRect.top + window.scrollY;
-            }
+            // No need for scroll restoration in modal - modal handles its own scrolling
             
             // Get fade overlays and item containers
             const item1Overlay = document.getElementById('item1-fade-overlay');
@@ -2030,8 +2100,8 @@
             // Clear countdown interval if still running
             clearInterval(countdownInterval);
             
-            // Load next matchup (preserving scroll position)
-            await loadNextMatchup(null, null, referenceElement, referenceOffset);
+            // Load next matchup
+            await loadNextMatchup();
             
             // Update rankings asynchronously without blocking (fire and forget)
             // This ensures rankings are updated but doesn't cause scroll jumps
@@ -2232,8 +2302,8 @@
                             <div class="edit-form">
                                 <input type="text" id="item-name-input-${item.id}" value="${escapeHtml(item.name)}" placeholder="Item name">
                                 <input type="text" id="item-media-input-${item.id}" value="${item.media_link || ''}" placeholder="YouTube link (optional)">
-                                <button onclick="saveItemEdit(${item.id})">Save</button>
-                                <button class="secondary" onclick="cancelItemEdit(${item.id})">Cancel</button>
+                                <button type="button" onclick="saveItemEdit(${item.id})">Save</button>
+                                <button type="button" class="secondary" onclick="cancelItemEdit(${item.id})">Cancel</button>
                             </div>
                         </div>
                         <div id="item-display-${item.id}">
@@ -2244,9 +2314,9 @@
                             })() : ''}
                             <div class="item-actions">
                                 <a href="${escapeHtml(searchUrl)}" target="_blank" style="padding: 6px 12px; font-size: 0.85em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">🔍 Search YouTube</a>
-                                <button onclick="autoFillYouTube(${item.id}, event)" style="padding: 6px 12px; font-size: 0.85em; background: #28a745; color: white;">🤖 Auto YT</button>
-                                <button onclick="editItem(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">✏️ Edit</button>
-                                <button onclick="viewItemVotes(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">📊 View Votes</button>
+                                <button type="button" onclick="autoFillYouTube(${item.id}, event)" style="padding: 6px 12px; font-size: 0.85em; background: #28a745; color: white;">🤖 Auto YT</button>
+                                <button type="button" onclick="editItem(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">✏️ Edit</button>
+                                <button type="button" onclick="viewItemVotes(${item.id})" style="padding: 6px 12px; font-size: 0.85em;">📊 View Votes</button>
                             </div>
                         </div>
                     </div>
@@ -2941,8 +3011,8 @@
                             <input type="text" id="matchup-item-media-${item1.id}" value="${item1.media_link || ''}" placeholder="Paste YouTube link here" style="width: 100%; padding: 8px;">
                         </div>
                         <div style="display: flex; gap: 10px;">
-                            <button onclick="saveMatchupItemEdit(${item1.id})">Save</button>
-                            <button class="secondary" onclick="cancelMatchupItemEdit(${item1.id})">Cancel</button>
+                            <button type="button" onclick="saveMatchupItemEdit(${item1.id})">Save</button>
+                            <button type="button" class="secondary" onclick="cancelMatchupItemEdit(${item1.id})">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -2958,8 +3028,8 @@
                             <input type="text" id="matchup-item-media-${item2.id}" value="${item2.media_link || ''}" placeholder="Paste YouTube link here" style="width: 100%; padding: 8px;">
                         </div>
                         <div style="display: flex; gap: 10px;">
-                            <button onclick="saveMatchupItemEdit(${item2.id})">Save</button>
-                            <button class="secondary" onclick="cancelMatchupItemEdit(${item2.id})">Cancel</button>
+                            <button type="button" onclick="saveMatchupItemEdit(${item2.id})">Save</button>
+                            <button type="button" class="secondary" onclick="cancelMatchupItemEdit(${item2.id})">Cancel</button>
                         </div>
                     </div>
                 </div>
