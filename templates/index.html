@@ -299,6 +299,16 @@
             to { transform: rotate(360deg); }
         }
 
+        #reveal-scores-btn {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #reveal-scores-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
+        }
+
         .collections-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -1532,10 +1542,10 @@
                         </div>
                     </div>
                     <div id="submit-vote-section" style="margin-top: 20px; text-align: center;">
-                        <button onclick="submitSelectedVote()" id="submit-vote-btn" disabled class="submit-vote-btn-inactive" style="padding: 12px 32px; font-size: 1.1em;">Submit</button>
+                        <button onclick="submitSelectedVote()" id="submit-vote-btn" disabled class="submit-vote-btn-inactive" style="padding: 12px 32px; font-size: 1.1em; display: none;">Submit</button>
+                        <button id="reveal-scores-btn" onclick="revealScores()" style="padding: 12px 32px; font-size: 1.1em; background: #6c757d; color: white; display: none;">📊 Reveal Scores</button>
                     </div>
                     <div style="width: 100%; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;">
-                        <button id="reveal-scores-btn" onclick="revealScores()" style="padding: 10px 20px; font-size: 0.95em; background: #6c757d; color: white;">📊 Reveal Scores</button>
                         ${window.lastVote ? `
                         <button onclick="changeLastVote()" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px;">↩️ Revise Last Vote</button>
                         ` : ''}
@@ -1664,11 +1674,19 @@
 
         let selectedVote = null;
 
+        function areScoresRevealed() {
+            const score1Container = document.getElementById('item1-score-container');
+            const score2Container = document.getElementById('item2-score-container');
+            return score1Container && score1Container.innerHTML.trim() !== '' &&
+                   score2Container && score2Container.innerHTML.trim() !== '';
+        }
+
         function updateVoteButtonStates() {
             const tieButton = document.getElementById('tie-button');
             const item1Container = document.getElementById('item1-container');
             const item2Container = document.getElementById('item2-container');
             const submitBtn = document.getElementById('submit-vote-btn');
+            const revealBtn = document.getElementById('reveal-scores-btn');
             
             // Update center button symbol
             if (tieButton) {
@@ -1708,16 +1726,34 @@
                 }
             }
             
-            // Update submit button state
-            if (submitBtn) {
-                // Don't change button state if it's currently submitting
-                if (!submitBtn.classList.contains('submitting')) {
-                    if (selectedVote === null) {
-                        submitBtn.disabled = true;
-                        submitBtn.classList.add('submit-vote-btn-inactive');
+            // Update button visibility and state based on combined logic
+            const scoresRevealed = areScoresRevealed();
+            const hasVoteSelected = selectedVote !== null;
+            
+            if (submitBtn && revealBtn) {
+                // Don't change button state if submit is currently submitting
+                const isSubmitting = submitBtn.classList.contains('submitting');
+                
+                if (!isSubmitting) {
+                    // Show reveal button if: no vote selected AND scores not revealed
+                    // Show submit button if: vote selected OR scores already revealed
+                    if (!hasVoteSelected && !scoresRevealed) {
+                        // Show reveal button, hide submit button
+                        revealBtn.style.display = 'inline-block';
+                        submitBtn.style.display = 'none';
                     } else {
-                        submitBtn.disabled = false;
-                        submitBtn.classList.remove('submit-vote-btn-inactive');
+                        // Show submit button, hide reveal button
+                        revealBtn.style.display = 'none';
+                        submitBtn.style.display = 'inline-block';
+                        
+                        // Update submit button state
+                        if (hasVoteSelected) {
+                            submitBtn.disabled = false;
+                            submitBtn.classList.remove('submit-vote-btn-inactive');
+                        } else {
+                            submitBtn.disabled = true;
+                            submitBtn.classList.add('submit-vote-btn-inactive');
+                        }
                     }
                 }
             }
@@ -1868,11 +1904,8 @@
                     score2Container.innerHTML = `<div style="font-weight: bold; color: #333;">${escapeHtml(score2Display)} pts</div>`;
                 }
                 
-                // Hide the Reveal Scores button after scores are shown
-                const revealBtn = document.getElementById('reveal-scores-btn');
-                if (revealBtn) {
-                    revealBtn.style.display = 'none';
-                }
+                // Update button visibility - reveal button will be hidden and submit button shown
+                updateVoteButtonStates();
             } catch (error) {
                 console.error('Error revealing scores:', error);
                 alert('Error revealing scores');
