@@ -477,23 +477,21 @@
         }
 
         .video-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            max-width: 560px;
-            margin: 15px auto;
-            position: relative;
-            padding-bottom: 56.25%; /* 16:9 aspect ratio */
-            height: 0;
+            height: 100%;
             background: #e9ecef;
             border-radius: 8px;
             z-index: 1; /* Behind the video iframe */
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .video-placeholder::after {
             content: '📺';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
             font-size: 3em;
             opacity: 0.3;
         }
@@ -1979,6 +1977,7 @@
             await new Promise(resolve => setTimeout(resolve, fadeDuration));
             
             // Start 3-second countdown timer in center circle immediately after fade
+            const countdownStartTime = Date.now();
             let countdown = 3;
             if (tieButton) {
                 tieButton.textContent = countdown.toString();
@@ -2023,8 +2022,10 @@
                 throw new Error(`Error submitting matchup: ${errorText}`);
             }
             
-            // Wait for countdown to complete (total 3 seconds)
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Wait for countdown to complete - ensure we wait a full 3 seconds from when countdown started
+            const elapsedTime = Date.now() - countdownStartTime;
+            const remainingTime = Math.max(0, 3000 - elapsedTime);
+            await new Promise(resolve => setTimeout(resolve, remainingTime));
             
             // Clear countdown interval if still running
             clearInterval(countdownInterval);
