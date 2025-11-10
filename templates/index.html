@@ -1203,6 +1203,19 @@
                 return '';
             }
             
+            // Determine which item is the winner (A) and which is the loser (B)
+            let itemA, itemB;
+            if (vote.vote_result === 'item1') {
+                itemA = vote.item1;
+                itemB = vote.item2;
+            } else if (vote.vote_result === 'item2') {
+                itemA = vote.item2;
+                itemB = vote.item1;
+            } else {
+                // For tie votes, we shouldn't have contradicting/supporting items, but handle gracefully
+                return '';
+            }
+            
             let html = '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">';
             
             if (contradicting.length > 0) {
@@ -1218,7 +1231,10 @@
                 }
                 html += '</div>';
                 html += '<div style="font-size: 0.85em; color: #666; margin-top: 4px;">';
-                html += 'These items create contradictions: B > C and C > A';
+                const contradictingDescriptions = contradicting.map(item => {
+                    return `${escapeHtml(itemB.name)} beats ${escapeHtml(item.name)} and ${escapeHtml(item.name)} beats ${escapeHtml(itemA.name)}`;
+                });
+                html += 'These items create contradictions: ' + contradictingDescriptions.join('; ');
                 html += '</div>';
                 html += '</div>';
             }
@@ -1236,7 +1252,10 @@
                 }
                 html += '</div>';
                 html += '<div style="font-size: 0.85em; color: #666; margin-top: 4px;">';
-                html += 'These items reinforce the ordering: A > C and C > B';
+                const supportingDescriptions = supporting.map(item => {
+                    return `${escapeHtml(itemA.name)} beats ${escapeHtml(item.name)} and ${escapeHtml(item.name)} beats ${escapeHtml(itemB.name)}`;
+                });
+                html += 'These items reinforce the ordering: ' + supportingDescriptions.join('; ');
                 html += '</div>';
                 html += '</div>';
             }

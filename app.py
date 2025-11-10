@@ -799,10 +799,10 @@ def calculate_swap_impact(collection, comp_to_swap, items_dict, comparisons, cur
 
 def find_contradicting_and_supporting_items(item_a_id, item_b_id, items_dict, comparisons):
     """
-    Find contradicting and supporting items for a vote "A is better than B".
+    Find contradicting and supporting items for a vote where item A beats item B.
     
-    A contradicting item C satisfies: B > C AND C > A (both votes exist)
-    A supporting item C satisfies: A > C AND C > B (both votes exist)
+    A contradicting item C satisfies: item B beats item C AND item C beats item A (both votes exist)
+    A supporting item C satisfies: item A beats item C AND item C beats item B (both votes exist)
     
     Args:
         item_a_id: ID of item A (the winner in the vote)
@@ -849,24 +849,24 @@ def find_contradicting_and_supporting_items(item_a_id, item_b_id, items_dict, co
         if item_c_id == item_a_id or item_c_id == item_b_id:
             continue
         
-        # Check for contradicting item: B > C AND C > A
+        # Check for contradicting item: item B beats item C AND item C beats item A
         bc_result = does_item_win(item_b_id, item_c_id)
         ca_result = does_item_win(item_c_id, item_a_id)
         
         if bc_result is True and ca_result is True:
-            # B beats C AND C beats A - this contradicts A > B
+            # item B beats item C AND item C beats item A - this contradicts item A beating item B
             contradicting_items.append({
                 'id': item_c.id,
                 'name': item_c.name,
                 'points': item_c.points
             })
         
-        # Check for supporting item: A > C AND C > B
+        # Check for supporting item: item A beats item C AND item C beats item B
         ac_result = does_item_win(item_a_id, item_c_id)
         cb_result = does_item_win(item_c_id, item_b_id)
         
         if ac_result is True and cb_result is True:
-            # A beats C AND C beats B - this supports A > B
+            # item A beats item C AND item C beats item B - this supports item A beating item B
             supporting_items.append({
                 'id': item_c.id,
                 'name': item_c.name,
