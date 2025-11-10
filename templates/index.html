@@ -985,14 +985,15 @@
         /**
          * Reset temporary UI state when switching activities.
          * This ensures that when you navigate back to an activity, it's in its initial state.
+         * Note: window.lastVote persists across activities as it's session-level state.
          */
         function resetActivityState() {
             // Reset histogram selection when leaving rankings
             selectedScorePaths.clear();
             
             // Reset matchup-specific state when leaving matchup activity
+            // Note: window.lastVote is NOT reset here - it persists across activities
             selectedVote = null;
-            window.lastVote = null;
             
             // Clear any temporary UI state that might exist
             // (Add more resets here as needed for other activities)
