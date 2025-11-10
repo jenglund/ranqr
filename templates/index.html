@@ -503,27 +503,6 @@
             position: relative;
         }
 
-        .item-fade-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0);
-            border-radius: 12px;
-            pointer-events: none;
-            z-index: 10;
-            transition: background-color 0.5s ease;
-        }
-
-        .item-fade-overlay.active {
-            background: rgba(0, 0, 0, 1);
-            pointer-events: all; /* Block interactions when fully black */
-        }
-
-        .matchup-item.faded {
-            pointer-events: none; /* Prevent interaction with container when faded */
-        }
 
         .item-actions {
             display: flex;
@@ -1743,7 +1722,6 @@
                                 <div id="item1-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
                                 <div class="item-interactive-elements">${video1}</div>
                             </div>
-                            <div class="item-fade-overlay" id="item1-fade-overlay"></div>
                         </div>
                         <button type="button" class="matchup-vs-btn" id="tie-button" onclick="selectVote('tie')">?</button>
                         <div class="matchup-item clickable-item" id="item2-container" data-item="item2">
@@ -1757,7 +1735,6 @@
                                 <div id="item2-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
                                 <div class="item-interactive-elements">${video2}</div>
                             </div>
-                            <div class="item-fade-overlay" id="item2-fade-overlay"></div>
                         </div>
                     </div>
                     <div id="submit-vote-section" style="margin-top: 20px; text-align: center;">
@@ -2015,58 +1992,7 @@
                 winner: result
             };
             
-            // No need for scroll restoration in modal - modal handles its own scrolling
-            
-            // Get fade overlays and item containers
-            const item1Overlay = document.getElementById('item1-fade-overlay');
-            const item2Overlay = document.getElementById('item2-fade-overlay');
-            const item1Container = document.getElementById('item1-container');
-            const item2Container = document.getElementById('item2-container');
-            const tieButton = document.getElementById('tie-button');
-            
-            // Disable interactions immediately
-            if (item1Container) item1Container.classList.add('faded');
-            if (item2Container) item2Container.classList.add('faded');
-            if (tieButton) tieButton.style.pointerEvents = 'none';
-            
-            // Fade containers to black (0.5-1 second)
-            const fadeDuration = 750; // 0.75 seconds
-            if (item1Overlay && item2Overlay) {
-                // Trigger fade by adding active class
-                item1Overlay.style.transition = `background-color ${fadeDuration}ms ease`;
-                item2Overlay.style.transition = `background-color ${fadeDuration}ms ease`;
-                
-                // Use requestAnimationFrame to ensure the transition starts
-                requestAnimationFrame(() => {
-                    item1Overlay.classList.add('active');
-                    item2Overlay.classList.add('active');
-                });
-            }
-            
-            // Wait for fade to complete
-            await new Promise(resolve => setTimeout(resolve, fadeDuration));
-            
-            // Start 3-second countdown timer in center circle immediately after fade
-            const countdownStartTime = Date.now();
-            let countdown = 3;
-            if (tieButton) {
-                tieButton.textContent = countdown.toString();
-            }
-            const countdownInterval = setInterval(() => {
-                countdown--;
-                if (tieButton) {
-                    if (countdown > 0) {
-                        tieButton.textContent = countdown.toString();
-                    } else {
-                        tieButton.textContent = '';
-                    }
-                }
-                if (countdown <= 0) {
-                    clearInterval(countdownInterval);
-                }
-            }, 1000);
-            
-            // Submit vote while containers are black (during countdown)
+            // Submit vote immediately
             const response = await fetch(`/api/collections/${currentCollectionId}/matchup`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -2079,28 +2005,10 @@
             
             if (!response.ok) {
                 const errorText = await response.text();
-                clearInterval(countdownInterval);
-                // Remove fade overlays on error
-                if (item1Overlay) item1Overlay.classList.remove('active');
-                if (item2Overlay) item2Overlay.classList.remove('active');
-                if (item1Container) item1Container.classList.remove('faded');
-                if (item2Container) item2Container.classList.remove('faded');
-                if (tieButton) {
-                    tieButton.style.pointerEvents = '';
-                    updateVoteButtonStates(); // Reset button text
-                }
                 throw new Error(`Error submitting matchup: ${errorText}`);
             }
             
-            // Wait for countdown to complete - ensure we wait a full 3 seconds from when countdown started
-            const elapsedTime = Date.now() - countdownStartTime;
-            const remainingTime = Math.max(0, 3000 - elapsedTime);
-            await new Promise(resolve => setTimeout(resolve, remainingTime));
-            
-            // Clear countdown interval if still running
-            clearInterval(countdownInterval);
-            
-            // Load next matchup
+            // Load next matchup immediately after vote is submitted
             await loadNextMatchup();
             
             // Update rankings asynchronously without blocking (fire and forget)
