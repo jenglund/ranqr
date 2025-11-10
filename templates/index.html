@@ -1681,17 +1681,18 @@
         function createPlaceholderMatchupStructure() {
             // Create the full matchup structure with placeholders
             // This maintains the exact same layout and dimensions as the real matchup
+            // Use same element types (a, button) as real content to ensure identical rendering
             return `
                 <div class="matchup-items-row">
                     <div class="matchup-item clickable-item" id="item1-container" data-item="item1">
                         <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
-                            <div class="item-interactive-elements" id="item1-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
-                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">🔍 Search</span>
-                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">🤖 Auto YT</span>
-                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">✏️ Edit</span>
+                            <div class="item-interactive-elements" id="item1-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap; min-height: 24px;">
+                                <a href="#" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5; text-decoration: none; pointer-events: none; display: inline-block;">🔍 Search</a>
+                                <button type="button" style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5; border: none; cursor: default; pointer-events: none;">🤖 Auto YT</button>
+                                <button type="button" style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5; border: none; cursor: default; pointer-events: none;">✏️ Edit</button>
                             </div>
-                            <div id="item1-name" style="font-size: 1.2em; font-weight: bold; text-align: center; color: #999; min-height: 1.5em;">...</div>
-                            <div id="item1-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
+                            <div id="item1-name" style="font-size: 1.2em; font-weight: bold; text-align: center; color: #999; min-height: 2.4em; line-height: 1.2em; display: flex; align-items: center; justify-content: center;">...</div>
+                            <div id="item1-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em; line-height: 1.2em;"></div>
                             <div class="item-interactive-elements" id="item1-video-container">
                                 <div class="video-container">
                                     <div class="video-placeholder"></div>
@@ -1702,13 +1703,13 @@
                     <button type="button" class="matchup-vs-btn" id="tie-button" onclick="selectVote('tie')">?</button>
                     <div class="matchup-item clickable-item" id="item2-container" data-item="item2">
                         <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
-                            <div class="item-interactive-elements" id="item2-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
-                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">🔍 Search</span>
-                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">🤖 Auto YT</span>
-                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">✏️ Edit</span>
+                            <div class="item-interactive-elements" id="item2-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap; min-height: 24px;">
+                                <a href="#" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5; text-decoration: none; pointer-events: none; display: inline-block;">🔍 Search</a>
+                                <button type="button" style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5; border: none; cursor: default; pointer-events: none;">🤖 Auto YT</button>
+                                <button type="button" style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5; border: none; cursor: default; pointer-events: none;">✏️ Edit</button>
                             </div>
-                            <div id="item2-name" style="font-size: 1.2em; font-weight: bold; text-align: center; color: #999; min-height: 1.5em;">...</div>
-                            <div id="item2-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
+                            <div id="item2-name" style="font-size: 1.2em; font-weight: bold; text-align: center; color: #999; min-height: 2.4em; line-height: 1.2em; display: flex; align-items: center; justify-content: center;">...</div>
+                            <div id="item2-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em; line-height: 1.2em;"></div>
                             <div class="item-interactive-elements" id="item2-video-container">
                                 <div class="video-container">
                                     <div class="video-placeholder"></div>
@@ -1726,16 +1727,30 @@
         }
 
         function updateMatchupContent(data) {
-            // Update item names
+            // Update item names - preserve min-height and layout styles to prevent shifts
             const item1NameEl = document.getElementById('item1-name');
             const item2NameEl = document.getElementById('item2-name');
             if (item1NameEl) {
                 item1NameEl.textContent = data.item1.name;
                 item1NameEl.style.color = '#333';
+                // Ensure min-height is maintained to prevent layout shift
+                if (!item1NameEl.style.minHeight) {
+                    item1NameEl.style.minHeight = '2.4em';
+                }
+                if (!item1NameEl.style.lineHeight) {
+                    item1NameEl.style.lineHeight = '1.2em';
+                }
             }
             if (item2NameEl) {
                 item2NameEl.textContent = data.item2.name;
                 item2NameEl.style.color = '#333';
+                // Ensure min-height is maintained to prevent layout shift
+                if (!item2NameEl.style.minHeight) {
+                    item2NameEl.style.minHeight = '2.4em';
+                }
+                if (!item2NameEl.style.lineHeight) {
+                    item2NameEl.style.lineHeight = '1.2em';
+                }
             }
 
             // Update interactive elements (buttons and links)
@@ -1747,18 +1762,22 @@
             const item2InteractiveEl = document.getElementById('item2-interactive-elements');
             
             if (item1InteractiveEl) {
+                // Preserve min-height on container to prevent layout shift
+                item1InteractiveEl.style.minHeight = '24px';
                 item1InteractiveEl.innerHTML = `
-                    <a href="${escapeHtml(searchUrl1)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
-                    <button onclick="autoFillYouTube(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
-                    <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                    <a href="${escapeHtml(searchUrl1)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">🔍 Search</a>
+                    <button type="button" onclick="autoFillYouTube(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white; border: none;">🤖 Auto YT</button>
+                    <button type="button" onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em; border: none;">✏️ Edit</button>
                 `;
             }
             
             if (item2InteractiveEl) {
+                // Preserve min-height on container to prevent layout shift
+                item2InteractiveEl.style.minHeight = '24px';
                 item2InteractiveEl.innerHTML = `
-                    <a href="${escapeHtml(searchUrl2)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
-                    <button type="button" onclick="autoFillYouTube(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
-                    <button type="button" onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                    <a href="${escapeHtml(searchUrl2)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">🔍 Search</a>
+                    <button type="button" onclick="autoFillYouTube(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white; border: none;">🤖 Auto YT</button>
+                    <button type="button" onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; border: none;">✏️ Edit</button>
                 `;
             }
 
