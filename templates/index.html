@@ -473,6 +473,55 @@
             height: 100%;
             border: none;
             border-radius: 8px;
+            z-index: 2; /* Ensure video loads on top of placeholder */
+        }
+
+        .video-placeholder {
+            width: 100%;
+            max-width: 560px;
+            margin: 15px auto;
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            background: #e9ecef;
+            border-radius: 8px;
+            z-index: 1; /* Behind the video iframe */
+        }
+
+        .video-placeholder::after {
+            content: '📺';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3em;
+            opacity: 0.3;
+        }
+
+        .matchup-item {
+            position: relative;
+        }
+
+        .item-fade-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0);
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 10;
+            transition: background-color 0.5s ease;
+        }
+
+        .item-fade-overlay.active {
+            background: rgba(0, 0, 0, 1);
+            pointer-events: all; /* Block interactions when fully black */
+        }
+
+        .matchup-item.faded {
+            pointer-events: none; /* Prevent interaction with container when faded */
         }
 
         .item-actions {
@@ -1538,9 +1587,9 @@
                     return;
                 }
                 
-                // Build video embeds if media links exist
-                const video1 = data.item1.media_link ? getYouTubeEmbed(data.item1.media_link) : '';
-                const video2 = data.item2.media_link ? getYouTubeEmbed(data.item2.media_link) : '';
+                // Build video embeds if media links exist, always include placeholder
+                const video1 = data.item1.media_link ? getYouTubeEmbed(data.item1.media_link) : '<div class="video-placeholder"></div>';
+                const video2 = data.item2.media_link ? getYouTubeEmbed(data.item2.media_link) : '<div class="video-placeholder"></div>';
                 
                 // Get search prefix for YouTube search links
                 const searchPrefix = currentCollection ? (currentCollection.search_prefix || '') : '';
@@ -1558,8 +1607,9 @@
                                 </div>
                                 <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item1.name)}</div>
                                 <div id="item1-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
-                                ${video1 ? `<div class="item-interactive-elements">${video1}</div>` : ''}
+                                <div class="item-interactive-elements">${video1}</div>
                             </div>
+                            <div class="item-fade-overlay" id="item1-fade-overlay"></div>
                         </div>
                         <button class="matchup-vs-btn" id="tie-button" onclick="selectVote('tie')">?</button>
                         <div class="matchup-item clickable-item" id="item2-container" data-item="item2">
@@ -1571,8 +1621,9 @@
                                 </div>
                                 <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item2.name)}</div>
                                 <div id="item2-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
-                                ${video2 ? `<div class="item-interactive-elements">${video2}</div>` : ''}
+                                <div class="item-interactive-elements">${video2}</div>
                             </div>
+                            <div class="item-fade-overlay" id="item2-fade-overlay"></div>
                         </div>
                     </div>
                     <div id="submit-vote-section" style="margin-top: 20px; text-align: center;">
@@ -1898,6 +1949,55 @@
                 referenceOffset = containerRect.top + window.scrollY;
             }
             
+            // Get fade overlays and item containers
+            const item1Overlay = document.getElementById('item1-fade-overlay');
+            const item2Overlay = document.getElementById('item2-fade-overlay');
+            const item1Container = document.getElementById('item1-container');
+            const item2Container = document.getElementById('item2-container');
+            const tieButton = document.getElementById('tie-button');
+            
+            // Disable interactions immediately
+            if (item1Container) item1Container.classList.add('faded');
+            if (item2Container) item2Container.classList.add('faded');
+            if (tieButton) tieButton.style.pointerEvents = 'none';
+            
+            // Fade containers to black (0.5-1 second)
+            const fadeDuration = 750; // 0.75 seconds
+            if (item1Overlay && item2Overlay) {
+                // Trigger fade by adding active class
+                item1Overlay.style.transition = `background-color ${fadeDuration}ms ease`;
+                item2Overlay.style.transition = `background-color ${fadeDuration}ms ease`;
+                
+                // Use requestAnimationFrame to ensure the transition starts
+                requestAnimationFrame(() => {
+                    item1Overlay.classList.add('active');
+                    item2Overlay.classList.add('active');
+                });
+            }
+            
+            // Wait for fade to complete
+            await new Promise(resolve => setTimeout(resolve, fadeDuration));
+            
+            // Start 3-second countdown timer in center circle immediately after fade
+            let countdown = 3;
+            if (tieButton) {
+                tieButton.textContent = countdown.toString();
+            }
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                if (tieButton) {
+                    if (countdown > 0) {
+                        tieButton.textContent = countdown.toString();
+                    } else {
+                        tieButton.textContent = '';
+                    }
+                }
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+            
+            // Submit vote while containers are black (during countdown)
             const response = await fetch(`/api/collections/${currentCollectionId}/matchup`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -1910,11 +2010,26 @@
             
             if (!response.ok) {
                 const errorText = await response.text();
+                clearInterval(countdownInterval);
+                // Remove fade overlays on error
+                if (item1Overlay) item1Overlay.classList.remove('active');
+                if (item2Overlay) item2Overlay.classList.remove('active');
+                if (item1Container) item1Container.classList.remove('faded');
+                if (item2Container) item2Container.classList.remove('faded');
+                if (tieButton) {
+                    tieButton.style.pointerEvents = '';
+                    updateVoteButtonStates(); // Reset button text
+                }
                 throw new Error(`Error submitting matchup: ${errorText}`);
             }
             
-            // On success, load next matchup immediately (preserving scroll position)
-            // Update rankings asynchronously in the background (non-blocking)
+            // Wait for countdown to complete (total 3 seconds)
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Clear countdown interval if still running
+            clearInterval(countdownInterval);
+            
+            // Load next matchup (preserving scroll position)
             await loadNextMatchup(null, null, referenceElement, referenceOffset);
             
             // Update rankings asynchronously without blocking (fire and forget)
@@ -2282,6 +2397,7 @@
             }
             
             return `<div class="video-container">
+                <div class="video-placeholder"></div>
                 <iframe src="https://www.youtube.com/embed/${videoId}" 
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                     allowfullscreen>
