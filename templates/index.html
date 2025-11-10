@@ -858,7 +858,7 @@
                     <button class="matchup-close-btn" onclick="exitMatchup()" type="button" title="Exit to Rankings">✕</button>
                     <h3 class="section-title" id="pairwise-comparison-header" style="margin-top: 0;">Pairwise Comparison</h3>
                     <div id="matchup-container" class="matchup-container">
-                        <div class="loading">Loading next matchup...</div>
+                        <!-- Placeholder structure will be rendered by loadNextMatchup -->
                     </div>
                     <div id="matchup-edit-section" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
                         <h4 style="margin-bottom: 15px; color: #667eea;">Edit Items</h4>
@@ -871,7 +871,7 @@
             <div id="matchup-section" class="card hidden" style="display: none !important;">
                 <h3 class="section-title" id="pairwise-comparison-header">Pairwise Comparison</h3>
                 <div id="matchup-container" class="matchup-container">
-                    <div class="loading">Loading next matchup...</div>
+                    <!-- Placeholder structure will be rendered by loadNextMatchup -->
                 </div>
                 <div id="matchup-edit-section" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
                     <h4 style="margin-bottom: 15px; color: #667eea;">Edit Items</h4>
@@ -1678,12 +1678,181 @@
             }
         }
 
+        function createPlaceholderMatchupStructure() {
+            // Create the full matchup structure with placeholders
+            // This maintains the exact same layout and dimensions as the real matchup
+            return `
+                <div class="matchup-items-row">
+                    <div class="matchup-item clickable-item" id="item1-container" data-item="item1">
+                        <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
+                            <div class="item-interactive-elements" id="item1-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
+                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">🔍 Search</span>
+                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">🤖 Auto YT</span>
+                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">✏️ Edit</span>
+                            </div>
+                            <div id="item1-name" style="font-size: 1.2em; font-weight: bold; text-align: center; color: #999; min-height: 1.5em;">...</div>
+                            <div id="item1-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
+                            <div class="item-interactive-elements" id="item1-video-container">
+                                <div class="video-container">
+                                    <div class="video-placeholder"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="matchup-vs-btn" id="tie-button" onclick="selectVote('tie')">?</button>
+                    <div class="matchup-item clickable-item" id="item2-container" data-item="item2">
+                        <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
+                            <div class="item-interactive-elements" id="item2-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
+                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">🔍 Search</span>
+                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">🤖 Auto YT</span>
+                                <span style="padding: 4px 8px; font-size: 0.8em; background: #e9ecef; color: #6c757d; border-radius: 4px; opacity: 0.5;">✏️ Edit</span>
+                            </div>
+                            <div id="item2-name" style="font-size: 1.2em; font-weight: bold; text-align: center; color: #999; min-height: 1.5em;">...</div>
+                            <div id="item2-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
+                            <div class="item-interactive-elements" id="item2-video-container">
+                                <div class="video-container">
+                                    <div class="video-placeholder"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="submit-vote-section" style="margin-top: 20px; text-align: center;">
+                    <button type="button" onclick="submitSelectedVote()" id="submit-vote-btn" disabled class="submit-vote-btn-inactive" style="padding: 12px 32px; font-size: 1.1em; display: none;">Submit</button>
+                    <button type="button" id="reveal-scores-btn" onclick="revealScores()" style="padding: 12px 32px; font-size: 1.1em; background: #6c757d; color: white; display: none;">📊 Reveal Scores</button>
+                </div>
+                <div id="revise-vote-section" style="width: 100%; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;"></div>
+            `;
+        }
+
+        function updateMatchupContent(data) {
+            // Update item names
+            const item1NameEl = document.getElementById('item1-name');
+            const item2NameEl = document.getElementById('item2-name');
+            if (item1NameEl) {
+                item1NameEl.textContent = escapeHtml(data.item1.name);
+                item1NameEl.style.color = '#333';
+            }
+            if (item2NameEl) {
+                item2NameEl.textContent = escapeHtml(data.item2.name);
+                item2NameEl.style.color = '#333';
+            }
+
+            // Update interactive elements (buttons and links)
+            const searchPrefix = currentCollection ? (currentCollection.search_prefix || '') : '';
+            const searchUrl1 = getYouTubeSearchUrl(searchPrefix, data.item1.name);
+            const searchUrl2 = getYouTubeSearchUrl(searchPrefix, data.item2.name);
+
+            const item1InteractiveEl = document.getElementById('item1-interactive-elements');
+            const item2InteractiveEl = document.getElementById('item2-interactive-elements');
+            
+            if (item1InteractiveEl) {
+                item1InteractiveEl.innerHTML = `
+                    <a href="${escapeHtml(searchUrl1)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
+                    <button onclick="autoFillYouTube(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
+                    <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                `;
+            }
+            
+            if (item2InteractiveEl) {
+                item2InteractiveEl.innerHTML = `
+                    <a href="${escapeHtml(searchUrl2)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
+                    <button type="button" onclick="autoFillYouTube(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
+                    <button type="button" onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
+                `;
+            }
+
+            // Update video containers
+            const item1VideoContainer = document.getElementById('item1-video-container');
+            const item2VideoContainer = document.getElementById('item2-video-container');
+            
+            if (item1VideoContainer) {
+                if (data.item1.media_link) {
+                    item1VideoContainer.innerHTML = getYouTubeEmbed(data.item1.media_link);
+                } else {
+                    // Keep placeholder if no video - maintain same structure and dimensions
+                    item1VideoContainer.innerHTML = '<div class="video-container"><div class="video-placeholder"></div></div>';
+                }
+            }
+            
+            if (item2VideoContainer) {
+                if (data.item2.media_link) {
+                    item2VideoContainer.innerHTML = getYouTubeEmbed(data.item2.media_link);
+                } else {
+                    // Keep placeholder if no video - maintain same structure and dimensions
+                    item2VideoContainer.innerHTML = '<div class="video-container"><div class="video-placeholder"></div></div>';
+                }
+            }
+
+            // Update revise vote button
+            const reviseVoteSection = document.getElementById('revise-vote-section');
+            if (reviseVoteSection) {
+                if (window.lastVote) {
+                    reviseVoteSection.innerHTML = `
+                        <button type="button" onclick="changeLastVote()" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px;">↩️ Revise Last Vote</button>
+                    `;
+                } else {
+                    reviseVoteSection.innerHTML = '';
+                }
+            }
+        }
+
+        function setupMatchupEventHandlers() {
+            // Set up container click handlers
+            const item1Container = document.getElementById('item1-container');
+            const item2Container = document.getElementById('item2-container');
+            
+            // Remove old listeners by cloning and replacing
+            if (item1Container) {
+                const newItem1 = item1Container.cloneNode(true);
+                item1Container.parentNode.replaceChild(newItem1, item1Container);
+                newItem1.addEventListener('click', function(e) {
+                    if (e.target.closest('.item-interactive-elements') || 
+                        e.target.tagName === 'A' || 
+                        e.target.tagName === 'BUTTON' ||
+                        e.target.closest('iframe')) {
+                        return;
+                    }
+                    e.stopPropagation();
+                    selectVote('item1');
+                });
+            }
+            
+            if (item2Container) {
+                const newItem2 = item2Container.cloneNode(true);
+                item2Container.parentNode.replaceChild(newItem2, item2Container);
+                newItem2.addEventListener('click', function(e) {
+                    if (e.target.closest('.item-interactive-elements') || 
+                        e.target.tagName === 'A' || 
+                        e.target.tagName === 'BUTTON' ||
+                        e.target.closest('iframe')) {
+                        return;
+                    }
+                    e.stopPropagation();
+                    selectVote('item2');
+                });
+            }
+        }
+
         async function loadNextMatchup(specificItem1Id = null, specificItem2Id = null) {
             // Use the matchup container from the modal overlay
             const modalContent = document.getElementById('matchup-modal-content');
             const container = modalContent ? modalContent.querySelector('#matchup-container') : document.getElementById('matchup-container');
             
-            container.innerHTML = '<div class="loading">Loading next matchup...</div>';
+            // Render placeholder structure immediately to maintain layout
+            container.innerHTML = createPlaceholderMatchupStructure();
+            
+            // Clear selected vote immediately
+            selectedVote = null;
+            
+            // Clear any submitting state from submit button
+            const submitBtn = document.getElementById('submit-vote-btn');
+            if (submitBtn) {
+                submitBtn.classList.remove('submitting');
+            }
+            
+            // Update button states with placeholders
+            updateVoteButtonStates();
             
             try {
                 let url = `/api/collections/${currentCollectionId}/matchup`;
@@ -1696,57 +1865,16 @@
                 const data = await response.json();
                 
                 if (data.message) {
-                    container.innerHTML = `<div class="loading">${data.message}</div>`;
+                    // If all comparisons completed, show message but keep structure
+                    const item1NameEl = document.getElementById('item1-name');
+                    const item2NameEl = document.getElementById('item2-name');
+                    if (item1NameEl) item1NameEl.textContent = data.message;
+                    if (item2NameEl) item2NameEl.textContent = '';
                     return;
                 }
                 
-                // Build video embeds if media links exist, always include placeholder
-                const video1 = data.item1.media_link ? getYouTubeEmbed(data.item1.media_link) : '<div class="video-placeholder"></div>';
-                const video2 = data.item2.media_link ? getYouTubeEmbed(data.item2.media_link) : '<div class="video-placeholder"></div>';
-                
-                // Get search prefix for YouTube search links
-                const searchPrefix = currentCollection ? (currentCollection.search_prefix || '') : '';
-                const searchUrl1 = getYouTubeSearchUrl(searchPrefix, data.item1.name);
-                const searchUrl2 = getYouTubeSearchUrl(searchPrefix, data.item2.name);
-                
-                container.innerHTML = `
-                    <div class="matchup-items-row">
-                        <div class="matchup-item clickable-item" id="item1-container" data-item="item1">
-                            <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
-                                <div class="item-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
-                                    <a href="${escapeHtml(searchUrl1)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
-                                    <button onclick="autoFillYouTube(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
-                                    <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
-                                </div>
-                                <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item1.name)}</div>
-                                <div id="item1-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
-                                <div class="item-interactive-elements">${video1}</div>
-                            </div>
-                        </div>
-                        <button type="button" class="matchup-vs-btn" id="tie-button" onclick="selectVote('tie')">?</button>
-                        <div class="matchup-item clickable-item" id="item2-container" data-item="item2">
-                            <div class="matchup-item-content" style="display: flex; flex-direction: column; gap: 15px;">
-                                <div class="item-interactive-elements" style="display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
-                                    <a href="${escapeHtml(searchUrl2)}" target="_blank" style="padding: 4px 8px; font-size: 0.8em; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">🔍 Search</a>
-                                    <button type="button" onclick="autoFillYouTube(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em; background: #28a745; color: white;">🤖 Auto YT</button>
-                                    <button type="button" onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
-                                </div>
-                                <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item2.name)}</div>
-                                <div id="item2-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
-                                <div class="item-interactive-elements">${video2}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="submit-vote-section" style="margin-top: 20px; text-align: center;">
-                        <button type="button" onclick="submitSelectedVote()" id="submit-vote-btn" disabled class="submit-vote-btn-inactive" style="padding: 12px 32px; font-size: 1.1em; display: none;">Submit</button>
-                        <button type="button" id="reveal-scores-btn" onclick="revealScores()" style="padding: 12px 32px; font-size: 1.1em; background: #6c757d; color: white; display: none;">📊 Reveal Scores</button>
-                    </div>
-                    <div style="width: 100%; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;">
-                        ${window.lastVote ? `
-                        <button type="button" onclick="changeLastVote()" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px;">↩️ Revise Last Vote</button>
-                        ` : ''}
-                    </div>
-                `;
+                // Update content asynchronously
+                updateMatchupContent(data);
                 
                 // Set up edit section for both items
                 setupMatchupEditSection(data.item1, data.item2);
@@ -1782,55 +1910,18 @@
                 if (score1Container) score1Container.innerHTML = '';
                 if (score2Container) score2Container.innerHTML = '';
                 
-                // Clear selected vote when loading new matchup
-                selectedVote = null;
-                
-                // Set up container click handlers
-                const item1Container = document.getElementById('item1-container');
-                const item2Container = document.getElementById('item2-container');
-                
-                if (item1Container) {
-                    item1Container.addEventListener('click', function(e) {
-                        // Don't trigger if clicking on interactive elements or their children
-                        if (e.target.closest('.item-interactive-elements') || 
-                            e.target.tagName === 'A' || 
-                            e.target.tagName === 'BUTTON' ||
-                            e.target.closest('iframe')) {
-                            return;
-                        }
-                        e.stopPropagation();
-                        selectVote('item1');
-                    });
-                }
-                
-                if (item2Container) {
-                    item2Container.addEventListener('click', function(e) {
-                        // Don't trigger if clicking on interactive elements or their children
-                        if (e.target.closest('.item-interactive-elements') || 
-                            e.target.tagName === 'A' || 
-                            e.target.tagName === 'BUTTON' ||
-                            e.target.closest('iframe')) {
-                            return;
-                        }
-                        e.stopPropagation();
-                        selectVote('item2');
-                    });
-                }
-                
-                // Clear selected vote when loading new matchup
-                selectedVote = null;
-                
-                // Clear any submitting state from submit button
-                const submitBtn = document.getElementById('submit-vote-btn');
-                if (submitBtn) {
-                    submitBtn.classList.remove('submitting');
-                }
+                // Set up event handlers
+                setupMatchupEventHandlers();
                 
                 // Update center button and submit button state
                 updateVoteButtonStates();
             } catch (error) {
                 console.error('Error loading matchup:', error);
-                container.innerHTML = '<div class="loading">Error loading matchup</div>';
+                // Show error but keep structure
+                const item1NameEl = document.getElementById('item1-name');
+                const item2NameEl = document.getElementById('item2-name');
+                if (item1NameEl) item1NameEl.textContent = 'Error loading matchup';
+                if (item2NameEl) item2NameEl.textContent = '';
             }
         }
 
