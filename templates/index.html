@@ -982,7 +982,24 @@
             loadCollections();
         }
 
+        /**
+         * Reset temporary UI state when switching activities.
+         * This ensures that when you navigate back to an activity, it's in its initial state.
+         */
+        function resetActivityState() {
+            // Reset histogram selection when leaving rankings
+            selectedScorePaths.clear();
+            
+            // Reset matchup-specific state when leaving matchup activity
+            selectedVote = null;
+            window.lastVote = null;
+            
+            // Clear any temporary UI state that might exist
+            // (Add more resets here as needed for other activities)
+        }
+
         async function showMatchup() {
+            resetActivityState();
             document.getElementById('matchup-section').classList.remove('hidden');
             document.getElementById('rankings-section').classList.add('hidden');
             document.getElementById('fixed-triangles-section').classList.add('hidden');
@@ -991,6 +1008,7 @@
         }
 
         async function showRankings() {
+            resetActivityState();
             document.getElementById('matchup-section').classList.add('hidden');
             document.getElementById('rankings-section').classList.remove('hidden');
             document.getElementById('fixed-triangles-section').classList.add('hidden');
@@ -999,6 +1017,7 @@
         }
 
         async function showFixedTriangles() {
+            resetActivityState();
             document.getElementById('matchup-section').classList.add('hidden');
             document.getElementById('rankings-section').classList.add('hidden');
             document.getElementById('fixed-triangles-section').classList.remove('hidden');
@@ -1007,6 +1026,7 @@
         }
 
         async function showControversialVotes() {
+            resetActivityState();
             document.getElementById('matchup-section').classList.add('hidden');
             document.getElementById('rankings-section').classList.add('hidden');
             document.getElementById('fixed-triangles-section').classList.add('hidden');
@@ -1485,8 +1505,21 @@
             }
         }
 
-        async function loadNextMatchup(specificItem1Id = null, specificItem2Id = null) {
+        async function loadNextMatchup(specificItem1Id = null, specificItem2Id = null, scrollReferenceElement = null, scrollReferenceOffset = null) {
             const container = document.getElementById('matchup-container');
+            
+            // Store scroll position before updating DOM if we have a reference
+            let scrollRestoreInfo = null;
+            if (scrollReferenceElement && scrollReferenceOffset !== null) {
+                const containerRect = container.getBoundingClientRect();
+                const containerTop = containerRect.top + window.scrollY;
+                scrollRestoreInfo = {
+                    referenceOffset: scrollReferenceOffset,
+                    containerTopBefore: containerTop,
+                    scrollYBefore: window.scrollY
+                };
+            }
+            
             container.innerHTML = '<div class="loading">Loading next matchup...</div>';
             
             try {
@@ -1633,9 +1666,30 @@
                 // Update center button and submit button state
                 updateVoteButtonStates();
                 
-                // Scroll to comparison container if we're loading after a previous vote
-                if (window.lastVote) {
-                    // Use setTimeout to ensure DOM is fully rendered before scrolling
+                // Restore scroll position if we have scroll restore info (from async vote submission)
+                if (scrollRestoreInfo) {
+                    // Use requestAnimationFrame to ensure DOM is fully rendered before restoring scroll
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            const newContainerRect = container.getBoundingClientRect();
+                            const newContainerTop = newContainerRect.top + window.scrollY;
+                            
+                            // Calculate how much the container moved
+                            const containerTopDelta = newContainerTop - scrollRestoreInfo.containerTopBefore;
+                            
+                            // Restore scroll position relative to the reference point
+                            // The goal is to keep the same element at the same position in the viewport
+                            const targetScrollY = scrollRestoreInfo.scrollYBefore + containerTopDelta;
+                            
+                            window.scrollTo({
+                                top: targetScrollY,
+                                behavior: 'instant' // Use instant to avoid animation that might feel jarring
+                            });
+                        });
+                    });
+                } else if (window.lastVote) {
+                    // Fallback: Scroll to comparison container if we're loading after a previous vote
+                    // (but only if we don't have scroll restore info)
                     setTimeout(() => {
                         const matchupSection = document.getElementById('matchup-section');
                         const header = document.getElementById('pairwise-comparison-header');
@@ -1829,6 +1883,20 @@
                 winner: result
             };
             
+            // Store current scroll position and viewport reference point before making changes
+            const scrollPositionBefore = window.scrollY;
+            const matchupSection = document.getElementById('matchup-section');
+            const matchupContainer = document.getElementById('matchup-container');
+            let referenceElement = null;
+            let referenceOffset = 0;
+            
+            if (matchupSection && matchupContainer) {
+                // Use the matchup container as a reference point
+                const containerRect = matchupContainer.getBoundingClientRect();
+                referenceElement = matchupContainer;
+                referenceOffset = containerRect.top + window.scrollY;
+            }
+            
             const response = await fetch(`/api/collections/${currentCollectionId}/matchup`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -1844,9 +1912,15 @@
                 throw new Error(`Error submitting matchup: ${errorText}`);
             }
             
-            // On success, update rankings and load next matchup
-            await loadRankings(); // Update rankings
-            await loadNextMatchup(); // Load next matchup (this will clear selectedVote and update button states)
+            // On success, load next matchup immediately (preserving scroll position)
+            // Update rankings asynchronously in the background (non-blocking)
+            await loadNextMatchup(null, null, referenceElement, referenceOffset);
+            
+            // Update rankings asynchronously without blocking (fire and forget)
+            // This ensures rankings are updated but doesn't cause scroll jumps
+            loadRankings().catch(error => {
+                console.error('Error updating rankings in background:', error);
+            });
         }
 
         async function revealScores() {
