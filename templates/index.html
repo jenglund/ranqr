@@ -1443,6 +1443,7 @@
                                     <button onclick="toggleEditItem(${data.item1.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
                                 </div>
                                 <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item1.name)}</div>
+                                <div id="item1-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
                                 ${video1 ? `<div class="item-interactive-elements">${video1}</div>` : ''}
                             </div>
                         </div>
@@ -1455,6 +1456,7 @@
                                     <button onclick="toggleEditItem(${data.item2.id}, event)" style="padding: 4px 8px; font-size: 0.8em;">✏️ Edit</button>
                                 </div>
                                 <div style="font-size: 1.2em; font-weight: bold; text-align: center;">${escapeHtml(data.item2.name)}</div>
+                                <div id="item2-score-container" style="min-height: 20px; text-align: center; color: #666; font-size: 0.95em;"></div>
                                 ${video2 ? `<div class="item-interactive-elements">${video2}</div>` : ''}
                             </div>
                         </div>
@@ -1473,14 +1475,36 @@
                 // Set up edit section for both items
                 setupMatchupEditSection(data.item1, data.item2);
                 
+                // Pre-fetch scores for the two items
+                let item1ScoreData = null;
+                let item2ScoreData = null;
+                try {
+                    const collectionResponse = await fetch(`/api/collections/${currentCollectionId}`);
+                    const collection = await collectionResponse.json();
+                    
+                    item1ScoreData = collection.items.find(i => i.id === data.item1.id);
+                    item2ScoreData = collection.items.find(i => i.id === data.item2.id);
+                } catch (error) {
+                    console.error('Error pre-fetching scores:', error);
+                    // Continue without scores - revealScores will fetch them if needed
+                }
+                
                 window.currentMatchup = {
                     item1_id: data.item1.id,
                     item2_id: data.item2.id,
                     item1_name: data.item1.name,
                     item2_name: data.item2.name,
                     item1_media_link: data.item1.media_link,
-                    item2_media_link: data.item2.media_link
+                    item2_media_link: data.item2.media_link,
+                    item1_score_data: item1ScoreData,
+                    item2_score_data: item2ScoreData
                 };
+                
+                // Clear score containers initially
+                const score1Container = document.getElementById('item1-score-container');
+                const score2Container = document.getElementById('item2-score-container');
+                if (score1Container) score1Container.innerHTML = '';
+                if (score2Container) score2Container.innerHTML = '';
                 
                 // Clear selected vote when loading new matchup
                 selectedVote = null;
@@ -1726,17 +1750,22 @@
             }
             
             try {
-                // Fetch collection data to get item scores
-                const response = await fetch(`/api/collections/${currentCollectionId}`);
-                const collection = await response.json();
-                
-                // Find items in the collection
-                const item1 = collection.items.find(i => i.id === window.currentMatchup.item1_id);
-                const item2 = collection.items.find(i => i.id === window.currentMatchup.item2_id);
+                // Use pre-fetched scores if available, otherwise fetch them
+                let item1 = window.currentMatchup.item1_score_data;
+                let item2 = window.currentMatchup.item2_score_data;
                 
                 if (!item1 || !item2) {
-                    alert('Could not find item scores');
-                    return;
+                    // Fallback: fetch if not pre-fetched
+                    const response = await fetch(`/api/collections/${currentCollectionId}`);
+                    const collection = await response.json();
+                    
+                    item1 = collection.items.find(i => i.id === window.currentMatchup.item1_id);
+                    item2 = collection.items.find(i => i.id === window.currentMatchup.item2_id);
+                    
+                    if (!item1 || !item2) {
+                        alert('Could not find item scores');
+                        return;
+                    }
                 }
                 
                 // Format scores
@@ -1757,8 +1786,17 @@
                     score2Display = formattedScores.join(' / ');
                 }
                 
-                // Create and show popup
-                showScorePopup(window.currentMatchup.item1_name, score1Display, window.currentMatchup.item2_name, score2Display);
+                // Display scores in the containers underneath item names
+                const score1Container = document.getElementById('item1-score-container');
+                const score2Container = document.getElementById('item2-score-container');
+                
+                if (score1Container) {
+                    score1Container.innerHTML = `<div style="font-weight: bold; color: #333;">${escapeHtml(score1Display)} pts</div>`;
+                }
+                
+                if (score2Container) {
+                    score2Container.innerHTML = `<div style="font-weight: bold; color: #333;">${escapeHtml(score2Display)} pts</div>`;
+                }
             } catch (error) {
                 console.error('Error revealing scores:', error);
                 alert('Error revealing scores');
