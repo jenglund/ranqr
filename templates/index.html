@@ -772,6 +772,31 @@
             transform: scale(1.1);
         }
 
+        /* Undo button for matchup modal */
+        .matchup-undo-btn {
+            position: absolute;
+            top: 15px;
+            right: 65px;
+            background: #ffc107;
+            color: #000;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 1.5em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: all 0.2s;
+        }
+
+        .matchup-undo-btn:hover {
+            background: #e0a800;
+            transform: scale(1.1);
+        }
+
         /* Ensure matchup container fits well in modal */
         #matchup-modal-content .matchup-container {
             flex: 1;
@@ -857,6 +882,7 @@
             <!-- Matchup Modal Overlay (full-screen) -->
             <div id="matchup-modal-overlay" class="hidden">
                 <div id="matchup-modal-content">
+                    <button class="matchup-undo-btn" id="matchup-undo-btn" onclick="changeLastVote()" type="button" title="Revise Last Vote" style="display: none;">↩️</button>
                     <button class="matchup-close-btn" onclick="exitMatchup()" type="button" title="Exit to Rankings">✕</button>
                     <h3 class="section-title" id="pairwise-comparison-header" style="margin-top: 0;">Pairwise Comparison</h3>
                     <div id="matchup-container" class="matchup-container">
@@ -1153,6 +1179,8 @@
             document.getElementById('rankings-section').classList.add('hidden');
             document.getElementById('fixed-triangles-section').classList.add('hidden');
             document.getElementById('controversial-votes-section').classList.add('hidden');
+            // Update undo button visibility
+            updateUndoButtonVisibility();
             await loadNextMatchup();
         }
 
@@ -1724,7 +1752,6 @@
                     <button type="button" onclick="submitSelectedVote()" id="submit-vote-btn" disabled class="submit-vote-btn-inactive" style="padding: 12px 32px; font-size: 1.1em; display: none;">Submit</button>
                     <button type="button" id="reveal-scores-btn" onclick="revealScores()" style="padding: 12px 32px; font-size: 1.1em; background: #6c757d; color: white; display: none;">📊 Reveal Scores</button>
                 </div>
-                <div id="revise-vote-section" style="width: 100%; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;"></div>
             `;
         }
 
@@ -1805,21 +1832,8 @@
                 }
             }
 
-            // Update revise vote button
-            const reviseVoteSection = document.getElementById('revise-vote-section');
-            if (reviseVoteSection) {
-                if (window.lastVote) {
-                    reviseVoteSection.innerHTML = `
-                        <button type="button" onclick="changeLastVote()" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px;">↩️ Revise Last Vote</button>
-                    `;
-                } else {
-                    // Placeholder to maintain layout spacing when there's no last vote
-                    // Use a button element with same styling but hidden to maintain exact dimensions
-                    reviseVoteSection.innerHTML = `
-                        <button type="button" style="padding: 10px 20px; font-size: 0.95em; background: #ffc107; color: #000; margin-left: 10px; visibility: hidden; pointer-events: none;">↩️ Revise Last Vote</button>
-                    `;
-                }
-            }
+            // Update undo button visibility in header
+            updateUndoButtonVisibility();
         }
 
         function setupMatchupEventHandlers() {
@@ -2107,6 +2121,9 @@
                 item2_name: window.currentMatchup.item2_name,
                 winner: result
             };
+            
+            // Update undo button visibility
+            updateUndoButtonVisibility();
             
             // Submit vote immediately
             const response = await fetch(`/api/collections/${currentCollectionId}/matchup`, {
@@ -2909,6 +2926,17 @@
             }
         }
 
+        function updateUndoButtonVisibility() {
+            const undoBtn = document.getElementById('matchup-undo-btn');
+            if (undoBtn) {
+                if (window.lastVote) {
+                    undoBtn.style.display = 'flex';
+                } else {
+                    undoBtn.style.display = 'none';
+                }
+            }
+        }
+
         async function changeLastVote() {
             if (!window.lastVote) {
                 alert('No previous vote to change');
@@ -2979,6 +3007,9 @@
                 if (response.ok) {
                     // Update last vote info
                     window.lastVote.winner = winner;
+                    
+                    // Update undo button visibility
+                    updateUndoButtonVisibility();
                     
                     // Reload rankings and current matchup
                     await loadRankings();
