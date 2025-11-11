@@ -145,11 +145,12 @@
             flex: 1;
             min-width: 250px;
             padding: 30px;
-            border: 3px solid #ddd;
+            border: 3px solid #333;
             border-radius: 12px;
             text-align: center;
-            background: #f8f9fa;
+            background: #1a1a1a;
             transition: border-color 0.3s ease;
+            color: #808080;
         }
 
         .matchup-item.clickable-item {
@@ -164,7 +165,7 @@
         .matchup-item.clickable-item.selected {
             border-color: #28a745;
             border-width: 4px;
-            background: #f0fff4;
+            background: #1a2e1a;
         }
 
         .item-interactive-elements {
@@ -176,7 +177,7 @@
             font-size: 2em;
             font-weight: bold;
             color: #667eea;
-            background: white;
+            background: #1a1a1a;
             border: 3px solid #667eea;
             border-radius: 50%;
             width: 60px;
@@ -219,7 +220,7 @@
         .matchup-vs {
             font-size: 1.5em;
             font-weight: bold;
-            color: #667eea;
+            color: #808080;
         }
 
         .matchup-buttons {
@@ -486,7 +487,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: #e9ecef;
+            background: #2a2a2a;
             border-radius: 8px;
             z-index: 1; /* Behind the video iframe */
             display: flex;
@@ -498,6 +499,47 @@
             content: '📺';
             font-size: 3em;
             opacity: 0.3;
+        }
+
+        /* Dark mode styles for matchup modal content */
+        #matchup-modal-content .item-name,
+        #matchup-modal-content .matchup-item-content,
+        #matchup-modal-content h3,
+        #matchup-modal-content h4,
+        #matchup-modal-content p,
+        #matchup-modal-content span:not(.matchup-vs-btn),
+        #matchup-modal-content label {
+            color: #808080;
+        }
+
+        #matchup-modal-content .video-placeholder {
+            background: #2a2a2a;
+        }
+
+        #matchup-modal-content input[type="text"],
+        #matchup-modal-content textarea {
+            background: #1a1a1a;
+            border: 2px solid #333;
+            color: #808080;
+        }
+
+        #matchup-modal-content input[type="text"]:focus,
+        #matchup-modal-content textarea:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        #matchup-modal-content #matchup-edit-section {
+            border-top-color: #333;
+        }
+
+        #matchup-modal-content .section-title {
+            color: #808080;
+            border-bottom-color: #333;
+        }
+
+        #matchup-modal-content .form-group label {
+            color: #808080;
         }
 
         .matchup-item {
@@ -709,7 +751,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.95);
+            background: #000;
             z-index: 2000;
             display: flex;
             flex-direction: column;
@@ -727,7 +769,7 @@
             width: 100%;
             max-width: 1400px;
             max-height: 100vh;
-            background: white;
+            background: #000;
             border-radius: 12px;
             padding: 25px;
             display: flex;
@@ -737,6 +779,7 @@
             position: relative;
             /* Prevent scrolling on touch devices when content fits */
             overscroll-behavior: contain;
+            color: #808080;
         }
 
         /* Prevent body scroll when modal is open */
@@ -888,8 +931,8 @@
                     <div id="matchup-container" class="matchup-container">
                         <!-- Placeholder structure will be rendered by loadNextMatchup -->
                     </div>
-                    <div id="matchup-edit-section" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
-                        <h4 style="margin-bottom: 15px; color: #667eea;">Edit Items</h4>
+                    <div id="matchup-edit-section" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #333;">
+                        <h4 style="margin-bottom: 15px; color: #808080;">Edit Items</h4>
                         <div id="matchup-edit-items" style="display: flex; flex-direction: column; gap: 15px;"></div>
                     </div>
                 </div>
