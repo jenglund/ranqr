@@ -1804,7 +1804,8 @@
             const item2NameEl = document.getElementById('item2-name');
             if (item1NameEl) {
                 item1NameEl.textContent = data.item1.name;
-                item1NameEl.style.color = '#333';
+                // Remove inline color to allow CSS dark mode styles to apply
+                item1NameEl.style.color = '';
                 // Ensure min-height is maintained to prevent layout shift
                 if (!item1NameEl.style.minHeight) {
                     item1NameEl.style.minHeight = '2.4em';
@@ -1815,7 +1816,8 @@
             }
             if (item2NameEl) {
                 item2NameEl.textContent = data.item2.name;
-                item2NameEl.style.color = '#333';
+                // Remove inline color to allow CSS dark mode styles to apply
+                item2NameEl.style.color = '';
                 // Ensure min-height is maintained to prevent layout shift
                 if (!item2NameEl.style.minHeight) {
                     item2NameEl.style.minHeight = '2.4em';
@@ -2242,11 +2244,11 @@
                 const score2Container = document.getElementById('item2-score-container');
                 
                 if (score1Container) {
-                    score1Container.innerHTML = `<div style="font-weight: bold; color: #333;">${escapeHtml(score1Display)} pts</div>`;
+                    score1Container.innerHTML = `<div style="font-weight: bold; color: #808080;">${escapeHtml(score1Display)} pts</div>`;
                 }
                 
                 if (score2Container) {
-                    score2Container.innerHTML = `<div style="font-weight: bold; color: #333;">${escapeHtml(score2Display)} pts</div>`;
+                    score2Container.innerHTML = `<div style="font-weight: bold; color: #808080;">${escapeHtml(score2Display)} pts</div>`;
                 }
                 
                 // Update button visibility - reveal button will be hidden and submit button shown
