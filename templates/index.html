@@ -145,11 +145,18 @@
             flex: 1;
             min-width: 250px;
             padding: 30px;
-            border: 3px solid #333;
+            border: 3px solid #ddd;
             border-radius: 12px;
             text-align: center;
-            background: #1a1a1a;
+            background: white;
             transition: border-color 0.3s ease;
+            color: #333;
+        }
+        
+        /* Dark mode styles for matchup items */
+        #matchup-modal-content.dark-mode .matchup-item {
+            border: 3px solid #333;
+            background: #1a1a1a;
             color: #808080;
         }
 
@@ -165,6 +172,11 @@
         .matchup-item.clickable-item.selected {
             border-color: #28a745;
             border-width: 4px;
+            background: #e8f5e9;
+        }
+        
+        /* Dark mode selected item */
+        #matchup-modal-content.dark-mode .matchup-item.clickable-item.selected {
             background: #1a2e1a;
         }
 
@@ -177,7 +189,7 @@
             font-size: 2em;
             font-weight: bold;
             color: #667eea;
-            background: #1a1a1a;
+            background: white;
             border: 3px solid #667eea;
             border-radius: 50%;
             width: 60px;
@@ -189,6 +201,11 @@
             transition: all 0.3s ease;
             padding: 0;
             margin: 0 20px;
+        }
+        
+        /* Dark mode VS button */
+        #matchup-modal-content.dark-mode .matchup-vs-btn {
+            background: #1a1a1a;
         }
 
         .matchup-vs-btn:hover {
@@ -220,6 +237,11 @@
         .matchup-vs {
             font-size: 1.5em;
             font-weight: bold;
+            color: #666;
+        }
+        
+        /* Dark mode VS text */
+        #matchup-modal-content.dark-mode .matchup-vs {
             color: #808080;
         }
 
@@ -487,12 +509,17 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: #2a2a2a;
+            background: #f0f0f0;
             border-radius: 8px;
             z-index: 1; /* Behind the video iframe */
             display: flex;
             align-items: center;
             justify-content: center;
+        }
+        
+        /* Dark mode video placeholder */
+        #matchup-modal-content.dark-mode .video-placeholder {
+            background: #2a2a2a;
         }
 
         .video-placeholder::after {
@@ -501,26 +528,27 @@
             opacity: 0.3;
         }
 
-        /* Dark mode styles for matchup modal content */
-        #matchup-modal-content .item-name,
-        #matchup-modal-content .matchup-item-content,
-        #matchup-modal-content h3,
-        #matchup-modal-content h4,
-        #matchup-modal-content p,
-        #matchup-modal-content span:not(.matchup-vs-btn),
-        #matchup-modal-content label {
+        /* Dark mode styles for matchup modal content - only apply when dark-mode class is present */
+        #matchup-modal-content.dark-mode .item-name,
+        #matchup-modal-content.dark-mode .matchup-item-content,
+        #matchup-modal-content.dark-mode h3,
+        #matchup-modal-content.dark-mode h4,
+        #matchup-modal-content.dark-mode p,
+        #matchup-modal-content.dark-mode span:not(.matchup-vs-btn),
+        #matchup-modal-content.dark-mode label {
             color: #808080;
         }
 
-        #matchup-modal-content .video-placeholder {
+        #matchup-modal-content.dark-mode .video-placeholder {
             background: #2a2a2a;
         }
 
+        /* Light mode input fields in matchup modal */
         #matchup-modal-content input[type="text"],
         #matchup-modal-content textarea {
-            background: #1a1a1a;
-            border: 2px solid #333;
-            color: #808080;
+            background: white;
+            border: 2px solid #ddd;
+            color: #333;
         }
 
         #matchup-modal-content input[type="text"]:focus,
@@ -528,17 +556,58 @@
             border-color: #667eea;
             outline: none;
         }
-
-        #matchup-modal-content #matchup-edit-section {
-            border-top-color: #333;
+        
+        /* Dark mode input fields in matchup modal */
+        #matchup-modal-content.dark-mode input[type="text"],
+        #matchup-modal-content.dark-mode textarea {
+            background: #1a1a1a;
+            border: 2px solid #333;
+            color: #808080;
         }
 
+        #matchup-modal-content.dark-mode input[type="text"]:focus,
+        #matchup-modal-content.dark-mode textarea:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        /* Light mode edit section styles */
+        #matchup-modal-content #matchup-edit-section {
+            border-top-color: #ddd;
+        }
+        
+        #matchup-modal-content #matchup-edit-section h4 {
+            color: #667eea;
+        }
+        
+        /* Dark mode edit section styles */
+        #matchup-modal-content.dark-mode #matchup-edit-section {
+            border-top-color: #333;
+        }
+        
+        #matchup-modal-content.dark-mode #matchup-edit-section h4 {
+            color: #808080;
+        }
+
+        /* Light mode section title in matchup modal */
         #matchup-modal-content .section-title {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        /* Dark mode section title in matchup modal */
+        #matchup-modal-content.dark-mode .section-title {
             color: #808080;
             border-bottom-color: #333;
         }
 
+        /* Light mode form group labels in matchup modal */
         #matchup-modal-content .form-group label {
+            color: #555;
+        }
+        
+        /* Dark mode form group labels in matchup modal */
+        #matchup-modal-content.dark-mode .form-group label {
             color: #808080;
         }
 
@@ -769,7 +838,7 @@
             width: 100%;
             max-width: 1400px;
             max-height: 100vh;
-            background: #000;
+            background: white;
             border-radius: 12px;
             padding: 25px;
             display: flex;
@@ -779,6 +848,12 @@
             position: relative;
             /* Prevent scrolling on touch devices when content fits */
             overscroll-behavior: contain;
+            color: #333;
+        }
+        
+        /* Dark mode for modal content */
+        #matchup-modal-content.dark-mode {
+            background: #000;
             color: #808080;
         }
 
@@ -837,6 +912,31 @@
 
         .matchup-undo-btn:hover {
             background: #e0a800;
+            transform: scale(1.1);
+        }
+        
+        /* Light bulb toggle button for matchup modal */
+        .matchup-theme-toggle-btn {
+            position: absolute;
+            top: 15px;
+            right: 65px; /* Default position when undo button is not visible */
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 1.5em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: all 0.2s;
+        }
+        
+        .matchup-theme-toggle-btn:hover {
+            background: #218838;
             transform: scale(1.1);
         }
 
@@ -925,14 +1025,15 @@
             <!-- Matchup Modal Overlay (full-screen) -->
             <div id="matchup-modal-overlay" class="hidden">
                 <div id="matchup-modal-content">
+                    <button class="matchup-theme-toggle-btn" id="matchup-theme-toggle-btn" onclick="toggleMatchupTheme()" type="button" title="Toggle Light/Dark Mode">💡</button>
                     <button class="matchup-undo-btn" id="matchup-undo-btn" onclick="changeLastVote()" type="button" title="Revise Last Vote" style="display: none;">↩️</button>
                     <button class="matchup-close-btn" onclick="exitMatchup()" type="button" title="Exit to Rankings">✕</button>
                     <h3 class="section-title" id="pairwise-comparison-header" style="margin-top: 0;">Pairwise Comparison</h3>
                     <div id="matchup-container" class="matchup-container">
                         <!-- Placeholder structure will be rendered by loadNextMatchup -->
                     </div>
-                    <div id="matchup-edit-section" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #333;">
-                        <h4 style="margin-bottom: 15px; color: #808080;">Edit Items</h4>
+                    <div id="matchup-edit-section" class="hidden" style="margin-top: 20px; padding-top: 20px;">
+                        <h4 style="margin-bottom: 15px;">Edit Items</h4>
                         <div id="matchup-edit-items" style="display: flex; flex-direction: column; gap: 15px;"></div>
                     </div>
                 </div>
@@ -1222,7 +1323,12 @@
             document.getElementById('rankings-section').classList.add('hidden');
             document.getElementById('fixed-triangles-section').classList.add('hidden');
             document.getElementById('controversial-votes-section').classList.add('hidden');
-            // Update undo button visibility
+            // Reset to light mode (default)
+            const modalContent = document.getElementById('matchup-modal-content');
+            if (modalContent) {
+                modalContent.classList.remove('dark-mode');
+            }
+            // Update undo button visibility (also adjusts theme toggle position)
             updateUndoButtonVisibility();
             await loadNextMatchup();
         }
@@ -2973,12 +3079,28 @@
 
         function updateUndoButtonVisibility() {
             const undoBtn = document.getElementById('matchup-undo-btn');
+            const themeToggleBtn = document.getElementById('matchup-theme-toggle-btn');
             if (undoBtn) {
                 if (window.lastVote) {
                     undoBtn.style.display = 'flex';
+                    // When undo button is visible, theme toggle should be at right: 115px
+                    if (themeToggleBtn) {
+                        themeToggleBtn.style.right = '115px';
+                    }
                 } else {
                     undoBtn.style.display = 'none';
+                    // When undo button is hidden, theme toggle should be at right: 65px (taking undo button's position)
+                    if (themeToggleBtn) {
+                        themeToggleBtn.style.right = '65px';
+                    }
                 }
+            }
+        }
+        
+        function toggleMatchupTheme() {
+            const modalContent = document.getElementById('matchup-modal-content');
+            if (modalContent) {
+                modalContent.classList.toggle('dark-mode');
             }
         }
 
