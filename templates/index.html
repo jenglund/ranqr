@@ -1205,6 +1205,8 @@
 
         // MutationObserver for detecting content changes in matchup modal
         let matchupContentObserver = null;
+        // Flag to prevent infinite loop when preventOverScroll modifies styles
+        let isPreventingOverScroll = false;
 
         // Initialize
         window.onload = () => {
@@ -1349,6 +1351,9 @@
         }
 
         function preventOverScroll() {
+            // Prevent infinite loop if we're already modifying styles
+            if (isPreventingOverScroll) return;
+            
             // Check if content actually overflows and prevent scrolling if it doesn't
             const modalContent = document.getElementById('matchup-modal-content');
             if (!modalContent) return;
@@ -1357,15 +1362,31 @@
             requestAnimationFrame(() => {
                 const hasOverflow = modalContent.scrollHeight > modalContent.clientHeight;
                 
+                // Check current values to avoid unnecessary style changes
+                const currentOverflowY = modalContent.style.overflowY || '';
+                const currentOverscrollBehavior = modalContent.style.overscrollBehavior || '';
+                
+                // Set flag to prevent observer from triggering recursively
+                isPreventingOverScroll = true;
+                
                 if (!hasOverflow) {
-                    // Content fits - prevent scrolling
-                    modalContent.style.overflowY = 'hidden';
-                    modalContent.style.overscrollBehavior = 'none';
+                    // Content fits - prevent scrolling (only if not already set)
+                    if (currentOverflowY !== 'hidden' || currentOverscrollBehavior !== 'none') {
+                        modalContent.style.overflowY = 'hidden';
+                        modalContent.style.overscrollBehavior = 'none';
+                    }
                 } else {
-                    // Content overflows - allow scrolling
-                    modalContent.style.overflowY = 'auto';
-                    modalContent.style.overscrollBehavior = 'contain';
+                    // Content overflows - allow scrolling (only if not already set)
+                    if (currentOverflowY !== 'auto' || currentOverscrollBehavior !== 'contain') {
+                        modalContent.style.overflowY = 'auto';
+                        modalContent.style.overscrollBehavior = 'contain';
+                    }
                 }
+                
+                // Reset flag after a short delay to allow for any batched updates
+                setTimeout(() => {
+                    isPreventingOverScroll = false;
+                }, 0);
             });
         }
 
@@ -1386,11 +1407,26 @@
                 modalContent.classList.remove('dark-mode');
                 
                 // Set up MutationObserver to detect content changes (videos loading, etc.)
+                // Note: We watch childList and subtree changes, but NOT attributes on modalContent itself
+                // to avoid infinite loop when preventOverScroll modifies styles
                 if (matchupContentObserver) {
                     matchupContentObserver.disconnect();
                 }
-                matchupContentObserver = new MutationObserver(() => {
-                    preventOverScroll();
+                matchupContentObserver = new MutationObserver((mutations) => {
+                    // Only react to changes in children/subtree, not style changes on modalContent itself
+                    const hasRelevantChanges = mutations.some(mutation => {
+                        // Ignore attribute changes on the modalContent element itself
+                        if (mutation.target === modalContent && mutation.type === 'attributes') {
+                            return false;
+                        }
+                        // React to child list changes or attribute changes in children
+                        return mutation.type === 'childList' || 
+                               (mutation.type === 'attributes' && mutation.target !== modalContent);
+                    });
+                    
+                    if (hasRelevantChanges) {
+                        preventOverScroll();
+                    }
                 });
                 matchupContentObserver.observe(modalContent, {
                     childList: true,
