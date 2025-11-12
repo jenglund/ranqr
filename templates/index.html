@@ -2144,8 +2144,12 @@
             if (item1Container) {
                 if (item1HasVideo) {
                     // Videos present - remove old listeners manually without cloning
-                    // Remove all existing click listeners by replacing with a new one
-                    // (Note: This doesn't perfectly remove all listeners, but prevents the reload issue)
+                    // Remove any previously stored handler before adding a new one
+                    if (item1Container._matchupClickHandler) {
+                        item1Container.removeEventListener('click', item1Container._matchupClickHandler);
+                    }
+                    
+                    // Create and store the handler function
                     const clickHandler = function(e) {
                         if (e.target.closest('.item-interactive-elements') || 
                             e.target.tagName === 'A' || 
@@ -2156,8 +2160,9 @@
                         e.stopPropagation();
                         selectVote('item1');
                     };
-                    // Remove any existing listener by cloning just the event handler attachment
-                    item1Container.onclick = null;
+                    
+                    // Store handler reference on element for future removal
+                    item1Container._matchupClickHandler = clickHandler;
                     item1Container.addEventListener('click', clickHandler);
                 } else {
                     // No videos - safe to clone
@@ -2179,6 +2184,12 @@
             if (item2Container) {
                 if (item2HasVideo) {
                     // Videos present - remove old listeners manually without cloning
+                    // Remove any previously stored handler before adding a new one
+                    if (item2Container._matchupClickHandler) {
+                        item2Container.removeEventListener('click', item2Container._matchupClickHandler);
+                    }
+                    
+                    // Create and store the handler function
                     const clickHandler = function(e) {
                         if (e.target.closest('.item-interactive-elements') || 
                             e.target.tagName === 'A' || 
@@ -2189,7 +2200,9 @@
                         e.stopPropagation();
                         selectVote('item2');
                     };
-                    item2Container.onclick = null;
+                    
+                    // Store handler reference on element for future removal
+                    item2Container._matchupClickHandler = clickHandler;
                     item2Container.addEventListener('click', clickHandler);
                 } else {
                     // No videos - safe to clone
