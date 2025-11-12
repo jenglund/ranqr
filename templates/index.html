@@ -1369,6 +1369,9 @@
             const modalContent = document.getElementById('matchup-modal-content');
             if (!modalContent) return;
             
+            // Set flag immediately to prevent concurrent executions (before scheduling requestAnimationFrame)
+            isPreventingOverScroll = true;
+            
             // Use requestAnimationFrame to ensure DOM is updated
             requestAnimationFrame(() => {
                 const hasOverflow = modalContent.scrollHeight > modalContent.clientHeight;
@@ -1376,9 +1379,6 @@
                 // Check current values to avoid unnecessary style changes
                 const currentOverflowY = modalContent.style.overflowY || '';
                 const currentOverscrollBehavior = modalContent.style.overscrollBehavior || '';
-                
-                // Set flag to prevent observer from triggering recursively
-                isPreventingOverScroll = true;
                 
                 if (!hasOverflow) {
                     // Content fits - prevent scrolling (only if not already set)
