@@ -1213,11 +1213,16 @@
             loadCollections();
             
             // Add resize listener to re-check overflow when window size changes
+            // Only check when modal is actually visible
             let resizeTimeout;
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimeout);
                 resizeTimeout = setTimeout(() => {
-                    preventOverScroll();
+                    // Only prevent over-scroll if modal is visible
+                    const modalOverlay = document.getElementById('matchup-modal-overlay');
+                    if (modalOverlay && !modalOverlay.classList.contains('hidden')) {
+                        preventOverScroll();
+                    }
                 }, 100);
             });
         };
@@ -1353,6 +1358,12 @@
         function preventOverScroll() {
             // Prevent infinite loop if we're already modifying styles
             if (isPreventingOverScroll) return;
+            
+            // Check if modal is actually visible before modifying styles
+            const modalOverlay = document.getElementById('matchup-modal-overlay');
+            if (!modalOverlay || modalOverlay.classList.contains('hidden')) {
+                return;
+            }
             
             // Check if content actually overflows and prevent scrolling if it doesn't
             const modalContent = document.getElementById('matchup-modal-content');
