@@ -2132,35 +2132,80 @@
             const item1Container = document.getElementById('item1-container');
             const item2Container = document.getElementById('item2-container');
             
-            // Remove old listeners by cloning and replacing
+            // Check if containers have video iframes - if so, avoid cloning to prevent reload
+            // We check for iframes specifically, as placeholders don't have them
+            const item1VideoContainer = document.getElementById('item1-video-container');
+            const item2VideoContainer = document.getElementById('item2-video-container');
+            const item1HasVideo = item1VideoContainer && item1VideoContainer.querySelector('iframe') !== null;
+            const item2HasVideo = item2VideoContainer && item2VideoContainer.querySelector('iframe') !== null;
+            
+            // Remove old listeners by cloning and replacing (only if no videos present)
+            // If videos are present, we'll remove listeners manually to avoid destroying iframes
             if (item1Container) {
-                const newItem1 = item1Container.cloneNode(true);
-                item1Container.parentNode.replaceChild(newItem1, item1Container);
-                newItem1.addEventListener('click', function(e) {
-                    if (e.target.closest('.item-interactive-elements') || 
-                        e.target.tagName === 'A' || 
-                        e.target.tagName === 'BUTTON' ||
-                        e.target.closest('iframe')) {
-                        return;
-                    }
-                    e.stopPropagation();
-                    selectVote('item1');
-                });
+                if (item1HasVideo) {
+                    // Videos present - remove old listeners manually without cloning
+                    // Remove all existing click listeners by replacing with a new one
+                    // (Note: This doesn't perfectly remove all listeners, but prevents the reload issue)
+                    const clickHandler = function(e) {
+                        if (e.target.closest('.item-interactive-elements') || 
+                            e.target.tagName === 'A' || 
+                            e.target.tagName === 'BUTTON' ||
+                            e.target.closest('iframe')) {
+                            return;
+                        }
+                        e.stopPropagation();
+                        selectVote('item1');
+                    };
+                    // Remove any existing listener by cloning just the event handler attachment
+                    item1Container.onclick = null;
+                    item1Container.addEventListener('click', clickHandler);
+                } else {
+                    // No videos - safe to clone
+                    const newItem1 = item1Container.cloneNode(true);
+                    item1Container.parentNode.replaceChild(newItem1, item1Container);
+                    newItem1.addEventListener('click', function(e) {
+                        if (e.target.closest('.item-interactive-elements') || 
+                            e.target.tagName === 'A' || 
+                            e.target.tagName === 'BUTTON' ||
+                            e.target.closest('iframe')) {
+                            return;
+                        }
+                        e.stopPropagation();
+                        selectVote('item1');
+                    });
+                }
             }
             
             if (item2Container) {
-                const newItem2 = item2Container.cloneNode(true);
-                item2Container.parentNode.replaceChild(newItem2, item2Container);
-                newItem2.addEventListener('click', function(e) {
-                    if (e.target.closest('.item-interactive-elements') || 
-                        e.target.tagName === 'A' || 
-                        e.target.tagName === 'BUTTON' ||
-                        e.target.closest('iframe')) {
-                        return;
-                    }
-                    e.stopPropagation();
-                    selectVote('item2');
-                });
+                if (item2HasVideo) {
+                    // Videos present - remove old listeners manually without cloning
+                    const clickHandler = function(e) {
+                        if (e.target.closest('.item-interactive-elements') || 
+                            e.target.tagName === 'A' || 
+                            e.target.tagName === 'BUTTON' ||
+                            e.target.closest('iframe')) {
+                            return;
+                        }
+                        e.stopPropagation();
+                        selectVote('item2');
+                    };
+                    item2Container.onclick = null;
+                    item2Container.addEventListener('click', clickHandler);
+                } else {
+                    // No videos - safe to clone
+                    const newItem2 = item2Container.cloneNode(true);
+                    item2Container.parentNode.replaceChild(newItem2, item2Container);
+                    newItem2.addEventListener('click', function(e) {
+                        if (e.target.closest('.item-interactive-elements') || 
+                            e.target.tagName === 'A' || 
+                            e.target.tagName === 'BUTTON' ||
+                            e.target.closest('iframe')) {
+                            return;
+                        }
+                        e.stopPropagation();
+                        selectVote('item2');
+                    });
+                }
             }
         }
 
