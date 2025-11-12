@@ -156,7 +156,7 @@
         /* Dark mode styles for matchup items */
         #matchup-modal-content.dark-mode .matchup-item {
             border: 3px solid #333;
-            background: #1a1a1a;
+            background: #000000;
             color: #808080;
         }
 
@@ -177,7 +177,16 @@
         
         /* Dark mode selected item */
         #matchup-modal-content.dark-mode .matchup-item.clickable-item.selected {
-            background: #1a2e1a;
+            background: #000000;
+            border-color: #00ff00;
+            border-width: 4px;
+            color: #ffffff;
+        }
+        
+        /* Dark mode selected item text elements */
+        #matchup-modal-content.dark-mode .matchup-item.clickable-item.selected .item-name,
+        #matchup-modal-content.dark-mode .matchup-item.clickable-item.selected .matchup-item-content {
+            color: #ffffff;
         }
 
         .item-interactive-elements {
@@ -1961,11 +1970,19 @@
                 `;
             }
 
-            // Update video containers
+            // Update video containers - clean up old iframes first to prevent memory leaks
             const item1VideoContainer = document.getElementById('item1-video-container');
             const item2VideoContainer = document.getElementById('item2-video-container');
             
+            // Clean up old iframes before replacing content
             if (item1VideoContainer) {
+                const oldIframes = item1VideoContainer.querySelectorAll('iframe');
+                oldIframes.forEach(iframe => {
+                    // Stop video playback and remove event listeners
+                    iframe.src = '';
+                    iframe.remove();
+                });
+                
                 if (data.item1.media_link) {
                     item1VideoContainer.innerHTML = getYouTubeEmbed(data.item1.media_link);
                 } else {
@@ -1975,6 +1992,13 @@
             }
             
             if (item2VideoContainer) {
+                const oldIframes = item2VideoContainer.querySelectorAll('iframe');
+                oldIframes.forEach(iframe => {
+                    // Stop video playback and remove event listeners
+                    iframe.src = '';
+                    iframe.remove();
+                });
+                
                 if (data.item2.media_link) {
                     item2VideoContainer.innerHTML = getYouTubeEmbed(data.item2.media_link);
                 } else {
@@ -2028,6 +2052,14 @@
             // Use the matchup container from the modal overlay
             const modalContent = document.getElementById('matchup-modal-content');
             const container = modalContent ? modalContent.querySelector('#matchup-container') : document.getElementById('matchup-container');
+            
+            // Clean up all old YouTube iframes before replacing content to prevent memory leaks
+            const oldIframes = container.querySelectorAll('iframe');
+            oldIframes.forEach(iframe => {
+                // Stop video playback and release resources
+                iframe.src = '';
+                iframe.remove();
+            });
             
             // Render placeholder structure immediately to maintain layout
             container.innerHTML = createPlaceholderMatchupStructure();
@@ -2659,11 +2691,13 @@
                 </div>`;
             }
             
+            // Return iframe without placeholder - iframe will load immediately
+            // The placeholder was causing flickering and interaction delays
             return `<div class="video-container">
-                <div class="video-placeholder"></div>
                 <iframe src="https://www.youtube.com/embed/${videoId}" 
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                    allowfullscreen>
+                    allowfullscreen
+                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; border-radius: 8px;">
                 </iframe>
             </div>`;
         }
