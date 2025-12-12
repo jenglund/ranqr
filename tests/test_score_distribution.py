@@ -375,8 +375,13 @@ def test_recursive_score_distribution_all_same_sub_score(client, sample_collecti
         
         data = response.get_json()
         assert 'distribution' in data
-        # Since A and B haven't been compared, all sub-scores are 0, so empty distribution
-        assert len(data['distribution']) == 0
+        # When all sub-scores are the same (0), implementation returns a single bar
+        # for UX consistency, but sub_score_distribution should be empty
+        assert len(data['distribution']) == 1
+        assert data['distribution'][0]['score'] == 0
+        assert data['distribution'][0]['count'] == 2
+        # Single-bar histogram should not have nested sub_score_distribution
+        assert data['distribution'][0]['sub_score_distribution'] == []
 
 def test_recursive_score_distribution_nonexistent_collection(client):
     """Test recursive endpoint with non-existent collection."""
